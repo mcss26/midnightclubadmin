@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Midnight Manager</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&family=Outfit:wght@800&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="styles.css" />
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+
+  <div id="login-overlay">
+    <div class="login-box">
+      <h2 style="color:var(--mc-red);">SYSTEM ADMIN</h2>
+      <input type="password" id="passInput" class="login-input" placeholder="PASSWORD">
+      <button onclick="login()" class="btn-action" style="width:100%">INGRESAR</button>
+    </div>
+  </div>
+
+  <div id="dashboard" class="dashboard">
+    <h1 style="text-align:center; margin-bottom:40px;">PANEL DE CONTROL</h1>
+
+    <div class="section-title">Generador de Flyers</div>
+    
+    <div class="flyer-editor">
+      <div class="flyer-row">
+        <input type="text" id="flyerDate" class="flyer-input" placeholder="FECHA (Ej: SABADO 22.11)">
+        <input type="text" id="flyerDJ" class="flyer-input" placeholder="DJ GUEST (Ej: KOOZA)">
+      </div>
+      <div class="flyer-row">
+        <button onclick="saveFlyerTexts()" class="btn-action" style="background:#333; flex:1;">GUARDAR TEXTOS</button>
+        <button onclick="generateFlyer()" class="btn-action" style="flex:1;">✨ GENERAR FLYER</button>
+      </div>
+    </div>
+
+    <div class="flyer-preview-container">
+      <canvas id="flyerCanvas" width="1080" height="1920" style="display:none;"></canvas>
+      <img id="finalFlyer" class="flyer-preview" alt="Aquí aparecerá tu flyer">
+      <p id="flyerStatus" style="color:#666; font-size:12px; margin-top:10px;">Presiona GENERAR para ver la vista previa</p>
+      <a id="downloadFlyer" class="btn-action" style="text-decoration:none; display:none; margin-top:15px; background:#fff; color:#000;">DESCARGAR IMAGEN</a>
+    </div>
+
+    <div class="section-title">Gestión de Accesos & Links</div>
+    <div id="config-list">Cargando configuración...</div>
+
+    <div class="section-title">Imagen de Portada</div>
+    <div class="upload-box">
+      <label for="fileInput" class="upload-btn">SUBIR NUEVA FOTO</label>
+      <input type="file" id="fileInput" accept="image/*">
+      <img id="preview-img" src="" alt="">
+      <br>
+      <button id="btnSaveHero" class="btn-action" style="margin-top:15px; display:none;" onclick="uploadHero()">GUARDAR FOTO</button>
+    </div>
+
+    <div class="section-title">Solicitudes Member ID</div>
+    
+    <div class="insta-toolbar">
+      <span style="font-size:12px; font-weight:700; color:#aaa;">ABRIR INSTAGRAM:</span>
+      <input type="number" id="instaFrom" class="insta-input" placeholder="DE">
+      <input type="number" id="instaTo" class="insta-input" placeholder="A">
+      <button onclick="openBulkInstagrams()" class="btn-bulk">ABRIR PERFILES ↗</button>
+    </div>
+
+    <div class="search-bar-container">
+      <input type="text" id="searchMembers" class="search-input-admin" placeholder="🔍 Buscar por Nombre, Instagram, ID...">
+    </div>
+    
+    <button onclick="loadRequests()" style="margin-bottom:15px; background:none; border:1px solid #333; color:#fff; padding:5px;">↻ Recargar Lista</button>
+    <div id="requests-list"></div>
+  </div>
+
+  <script>
+    // === CLAVES ===
+    const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258'; 
+    
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const ADMIN_PASS = "admin"; 
+
+    let ALL_MEMBERS = [];
+    let CURRENT_HERO_URL = 'hero.jpg';
+
+    // LOGIN
+    function login() {
+      if(document.getElementById('passInput').value === ADMIN_PASS) {
+        document.getElementById('login-overlay').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        loadAll();
+      } else alert("Error");
+    }
+
+    function loadAll() {
+      loadConfig();
+      loadRequests();
+    }
+
+    // === GENERADOR DE FLYER ===
+    async function generateFlyer() {
+      const statusTxt = document.getElementById('flyerStatus');
+      statusTxt.innerText = "Generando...";
+      
+      const canvas = document.getElementById('flyerCanvas');
+      const ctx = canvas.getContext('2d');
+      
+      const dateText = document.getElementById('flyerDate').value.toUpperCase() || "FECHA";
+      const djText = document.getElementById('flyerDJ').value.toUpperCase() || "DJ GUEST";
+
+      const loadImage = (src) => new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.onload = () => resolve(img);
+        img.onerror = () => reject(new Error(`No se pudo cargar: ${src}`));
+        img.src = src;
+      });
+
+      try {
+        // Cargar imágenes (Asegúrate de tener templates/tpl-base.png en el repo)
+        const [heroImg, templateImg] = await Promise.all([
+          loadImage(CURRENT_HERO_URL),
+          loadImage('templates/tpl-base.png') 
+        ]);
+
+        // Dibujar Fondo
+        const scale = Math.max(canvas.width / heroImg.width, canvas.height / heroImg.height);
+        const x = (canvas.width / 2) - (heroImg.width / 2) * scale;
+        const y = (canvas.height / 2) - (heroImg.height / 2) * scale;
+        ctx.drawImage(heroImg, x, y, heroImg.width * scale, heroImg.height * scale);
+
+        // Dibujar Plantilla
+        ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
+
+        // Escribir Textos
+        ctx.fillStyle = "#E8372F"; // Rojo
+        ctx.textAlign = "center"; 
+        
+        // DJ (Posición Ajustable)
+        ctx.font = "900 38px 'Inter'";
+        ctx.fillText("DJ GUEST — " + djText, canvas.width / 2, 1720); 
+
+        // FECHA (Posición Ajustable)
+        ctx.font = "900 80px 'Inter'";
+        ctx.fillText(dateText, canvas.width / 2, 1820); 
+
+        // Exportar
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        document.getElementById('finalFlyer').src = dataUrl;
+        document.getElementById('finalFlyer').style.display = 'block';
+        
+        const dlBtn = document.getElementById('downloadFlyer');
+        dlBtn.href = dataUrl;
+        dlBtn.download = `Flyer-${dateText}.jpg`;
+        dlBtn.style.display = 'inline-block';
+        statusTxt.innerText = "¡Flyer generado!";
+
+      } catch (error) {
+        console.error(error);
+        statusTxt.innerText = "Error: Verifica que 'templates/tpl-base.png' exista.";
+      }
+    }
+
+    async function saveFlyerTexts() {
+      const date = document.getElementById('flyerDate').value;
+      const dj = document.getElementById('flyerDJ').value;
+      await client.from('site_config').upsert({ key: 'flyer_fecha', value: date });
+      await client.from('site_config').upsert({ key: 'flyer_dj', value: dj });
+      alert("Textos guardados.");
+    }
+
+    // === CONFIGURACIÓN & ACCESOS ===
+    async function loadConfig() {
+      const container = document.getElementById('config-list');
+      const { data } = await client.from('site_config').select('*');
+      container.innerHTML = '';
+      
+      data.forEach(conf => {
+        if(conf.key === 'hero_image') {
+            CURRENT_HERO_URL = conf.value !== 'default' ? conf.value : 'hero.jpg';
+            document.getElementById('preview-img').src = CURRENT_HERO_URL;
+            document.getElementById('preview-img').style.display = 'block';
+        }
+        else if (conf.key === 'flyer_fecha') document.getElementById('flyerDate').value = conf.value;
+        else if (conf.key === 'flyer_dj') document.getElementById('flyerDJ').value = conf.value;
+        else {
+            container.innerHTML += `
+            <div class="config-card">
+                <div class="config-header">
+                <span style="font-weight:700">${conf.value}</span>
+                <button onclick="toggleStatus('${conf.key}', ${conf.is_active})" 
+                    class="status-badge ${conf.is_active ? 'status-active' : 'status-soldout'}">
+                    ${conf.is_active ? 'DISPONIBLE' : 'AGOTADO'}
+                </button>
+                </div>
+                <div class="url-group">
+                <input type="text" id="url_${conf.key}" class="url-input" value="${conf.url || ''}" placeholder="Link...">
+                <button class="btn-save-url" onclick="saveUrl('${conf.key}')">💾</button>
+                </div>
+            </div>`;
+        }
+      });
+    }
+
+    async function toggleStatus(key, curr) { await client.from('site_config').update({ is_active: !curr }).eq('key', key); loadConfig(); }
+    async function saveUrl(key) { const newUrl = document.getElementById(`url_${key}`).value; await client.from('site_config').update({ url: newUrl }).eq('key', key); alert("Link guardado"); }
+    
+    // === HERO UPLOAD ===
+    const fileInput = document.getElementById('fileInput');
+    const previewImg = document.getElementById('preview-img');
+    const btnSaveHero = document.getElementById('btnSaveHero');
+    let fileToUpload = null;
+    fileInput.addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (file) { fileToUpload = file; previewImg.src = URL.createObjectURL(file); previewImg.style.display = 'block'; btnSaveHero.style.display = 'inline-block'; }
+    });
+    async function uploadHero() {
+      if (!fileToUpload) return;
+      btnSaveHero.textContent = "SUBIENDO...";
+      const fileName = `hero-${Date.now()}.jpg`;
+      await client.storage.from('content').upload(fileName, fileToUpload);
+      const { data: publicUrl } = client.storage.from('content').getPublicUrl(fileName);
+      await client.from('site_config').update({ value: publicUrl.publicUrl }).eq('key', 'hero_image');
+      alert("Portada actualizada!");
+      btnSaveHero.style.display = 'none';
+      loadConfig();
+    }
+
+    // === MIEMBROS ===
+    function formatInstagram(user) { let cleanUser = user.trim().replace('@', ''); if(cleanUser.includes('instagram.com')) return cleanUser; return `https://instagram.com/${cleanUser}`; }
+    async function loadRequests() {
+      document.getElementById('requests-list').innerHTML = 'Cargando...';
+      const { data } = await client.from('members').select('*').order('created_at', { ascending: false });
+      ALL_MEMBERS = data; renderMembers(ALL_MEMBERS);
+    }
+    function renderMembers(dataList) {
+      const list = document.getElementById('requests-list'); list.innerHTML = '';
+      if (dataList.length === 0) { list.innerHTML = '<p style="color:#666; text-align:center;">No hay resultados.</p>'; return; }
+      dataList.forEach((m) => {
+        const originalIndex = ALL_MEMBERS.findIndex(x => x.id === m.id); const number = originalIndex + 1; 
+        const isOk = m.status === 'activo'; const instaLink = formatInstagram(m.instagram);
+        list.innerHTML += `
+          <div class="req-card ${isOk ? 'approved' : ''}">
+            <div class="req-number">#${number}</div>
+            <div class="req-content"><div class="req-info"><strong>${m.nombre}</strong><br><a href="${instaLink}" target="_blank">@${m.instagram.replace('@','')}</a><br><small style="color:#666">${m.nacimiento} | ${m.telefono}</small>${isOk ? `<br><span style="color:#cdfb3e; font-size:11px;">ID: ${m.member_id}</span>` : ''}</div></div>
+            <div class="action-group">${!isOk ? `<button class="btn-action" onclick="approve(${m.id})">APROBAR</button>` : ''}<button class="btn-delete" onclick="deleteMember(${m.id})">✕</button></div>
+          </div>`;
+      });
+    }
+    document.getElementById('searchMembers').addEventListener('input', (e) => {
+      const term = e.target.value.toLowerCase();
+      if (term === '') { renderMembers(ALL_MEMBERS); return; }
+      const filtered = ALL_MEMBERS.filter(m => (m.nombre && m.nombre.toLowerCase().includes(term)) || (m.instagram && m.instagram.toLowerCase().includes(term)) || (m.email && m.email.toLowerCase().includes(term)) || (m.telefono && m.telefono.includes(term)) || (m.member_id && m.member_id.toLowerCase().includes(term)));
+      renderMembers(filtered);
+    });
+    function openBulkInstagrams() {
+      const from = parseInt(document.getElementById('instaFrom').value); const to = parseInt(document.getElementById('instaTo').value);
+      if (!from || !to || from > to) { alert("Rango inválido"); return; }
+      let delay = 0;
+      for (let i = from - 1; i < to; i++) {
+        if (ALL_MEMBERS[i]) { const url = formatInstagram(ALL_MEMBERS[i].instagram); setTimeout(() => { window.open(url, '_blank'); }, delay); delay += 300; }
+      }
+    }
+    window.approve = async (id) => { if(!confirm("¿Aprobar?")) return; const newID = "MC-" + Math.floor(1000 + Math.random() * 9000); const newPass = Math.random().toString(36).slice(-5).toUpperCase(); await client.from('members').update({ status: 'activo', member_id: newID, access_password: newPass }).eq('id', id); loadRequests(); }
+    window.deleteMember = async (id) => { if(!confirm("⚠️ ¿Borrar?")) return; await client.from('members').delete().eq('id', id); loadRequests(); }
+  </script>
+</body>
+</html>
