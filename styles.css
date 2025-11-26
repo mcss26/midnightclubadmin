@@ -120,3 +120,54 @@ body {
 }
 .insta-input { background: #000; border: 1px solid #444; color: #fff; padding: 8px; width: 60px; text-align: center; font-weight: 700; }
 .btn-bulk { background: #fff; color: #000; border: none; padding: 8px 15px; font-weight: 800; cursor: pointer; font-size: 12px; flex: 1; }
+
+/* === NUEVOS ESTILOS ADMIN === */
+
+/* Barra de Filtros */
+.filters-toolbar {
+  display: flex; gap: 10px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 5px;
+  scrollbar-width: none; /* Ocultar scrollbar Firefox */
+}
+.filters-toolbar::-webkit-scrollbar { display: none; /* Ocultar scrollbar Chrome/Safari */ }
+
+.filter-chip {
+  background: transparent; border: 1px solid #333; color: #888;
+  padding: 8px 16px; border-radius: 20px; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; cursor: pointer; white-space: nowrap; transition: all 0.2s;
+}
+.filter-chip:hover { border-color: #666; color: #fff; }
+/* Estado activo dinámico */
+.filter-chip.active[data-status="pendiente"] { background: var(--mc-red); border-color: var(--mc-red); color: #fff; }
+.filter-chip.active[data-status="activo"] { background: #cdfb3e; border-color: #cdfb3e; color: #000; }
+.filter-chip.active[data-status="rechazado"] { background: #666; border-color: #666; color: #fff; }
+.filter-chip.active[data-status="all"] { background: #fff; border-color: #fff; color: #000; }
+
+
+/* Tarjeta de Cumpleaños */
+.birthday-card {
+  background: #111; border: 1px solid #333; border-radius: 8px;
+  padding: 20px; margin-bottom: 30px;
+}
+.birthday-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #222;
+}
+.birthday-title { font-size: 14px; font-weight: 800; color: #fff; text-transform: uppercase; }
+.birthday-icon { font-size: 20px; }
+
+.bd-list { list-style: none; padding: 0; margin: 0; }
+.bd-item {
+  display: flex; align-items: center; gap: 15px;
+  padding: 12px 0; border-bottom: 1px dashed #222;
+}
+.bd-date {
+  display: flex; flex-direction: column; align-items: center;
+  background: #0a0a0a; border: 1px solid var(--mc-red);
+  padding: 5px 10px; border-radius: 6px; color: var(--mc-red);
+}
+.bd-day { font-size: 10px; font-weight: 700; text-transform: uppercase; }
+.bd-num { font-size: 16px; font-weight: 800; }
+.bd-info { flex: 1; }
+.bd-name { color: #fff; font-weight: 700; font-size: 14px; }
+.bd-id { color: #666; font-size: 11px; }
+.no-birthdays { color: #666; font-size: 12px; font-style: italic; text-align: center; padding: 20px 0; }
