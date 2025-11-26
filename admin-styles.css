@@ -1,0 +1,163 @@
+/* === MIDNIGHT ADMIN STYLES (GLOBAL) === */
+
+:root {
+    --mc-red: #e8372f;
+    --mc-bg: #050505; /* Fondo principal más oscuro */
+    --mc-card-bg: #111111; /* Fondo de tarjetas */
+    --mc-border: #222222; /* Color de bordes sutiles */
+    --mc-text: #ffffff;
+    --mc-text-muted: #888888;
+    --mc-accent-green: #cdfb3e; /* Verde neón para activos/éxito */
+}
+
+body {
+    background-color: var(--mc-bg);
+    color: var(--mc-text);
+    font-family: 'Inter', sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+
+/* --- LAYOUT & HEADER --- */
+.admin-header {
+    position: fixed; top: 0; left: 0; right: 0;
+    background: rgba(5, 5, 5, 0.95); backdrop-filter: blur(10px);
+    padding: 15px 30px; border-bottom: 1px solid var(--mc-border);
+    z-index: 100; display: flex; justify-content: space-between; align-items: center;
+}
+
+.admin-logo {
+    font-family: 'Outfit', sans-serif; font-weight: 900; font-size: 20px;
+    color: #fff; letter-spacing: -1px; text-transform: uppercase;
+}
+
+.btn-logout {
+    background: none; border: 1px solid #333; color: var(--mc-text-muted);
+    padding: 8px 16px; border-radius: 4px; font-size: 11px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; text-transform: uppercase; letter-spacing: 0.05em;
+}
+.btn-logout:hover { border-color: var(--mc-red); color: var(--mc-red); }
+
+.admin-container {
+    max-width: 1200px; margin: 90px auto 40px auto; padding: 0 20px;
+    display: grid; grid-template-columns: 1fr; /* Por defecto 1 columna */
+    gap: 30px; align-items: start;
+}
+/* Layout de 2 columnas solo para cuando se necesite (ej: sidebar) */
+.admin-container.with-sidebar { grid-template-columns: 1fr 380px; }
+@media (max-width: 900px) { .admin-container.with-sidebar { grid-template-columns: 1fr; } }
+
+
+/* --- TIPOGRAFÍA Y TÍTULOS --- */
+.section-header {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-bottom: 25px; padding-bottom: 15px; border-bottom: 1px solid var(--mc-border);
+}
+
+.section-title {
+    font-family: 'Outfit', sans-serif; color: #fff; font-size: 22px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: -0.02em; margin: 0;
+    display: flex; align-items: center; gap: 10px;
+}
+/* Línea roja decorativa a la izquierda del título */
+.section-title::before { content: ''; display: block; width: 6px; height: 22px; background: var(--mc-red); }
+
+.btn-refresh {
+    background: var(--mc-card-bg); color: var(--mc-text-muted); border: 1px solid var(--mc-border);
+    padding: 8px 12px; border-radius: 4px; font-size: 14px; cursor: pointer; transition: all 0.2s;
+}
+.btn-refresh:hover { color: #fff; border-color: #fff; }
+
+
+/* --- COMPONENTES COMUNES --- */
+
+/* Filtros (Chips) */
+.filters-toolbar {
+    display: flex; gap: 10px; margin-bottom: 25px; overflow-x: auto; padding-bottom: 5px;
+    scrollbar-width: none;
+}
+.filters-toolbar::-webkit-scrollbar { display: none; }
+
+.filter-chip {
+    background: transparent; border: 1px solid #333; color: #666;
+    padding: 10px 20px; border-radius: 30px; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; cursor: pointer; white-space: nowrap; transition: all 0.2s; letter-spacing: 0.05em;
+}
+.filter-chip:hover { border-color: #fff; color: #fff; }
+
+/* Estados Activos de Filtro */
+.filter-chip.active[data-status="pendiente"] { background: var(--mc-red); border-color: var(--mc-red); color: #fff; }
+.filter-chip.active[data-status="activo"] { background: var(--mc-accent-green); border-color: var(--mc-accent-green); color: #000; }
+.filter-chip.active[data-status="rechazado"] { background: #444; border-color: #444; color: #fff; }
+.filter-chip.active[data-status="all"] { background: #fff; border-color: #fff; color: #000; }
+
+/* Tarjetas de Solicitud (Lista) */
+.request-card {
+    background: var(--mc-card-bg); border: 1px solid var(--mc-border); border-radius: 12px;
+    padding: 25px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.request-card:hover { transform: translateY(-2px); box-shadow: 0 10px 30px -10px rgba(0,0,0,0.5); }
+
+.req-info h3 { margin: 0 0 10px 0; color: #fff; font-size: 18px; font-weight: 700; display: flex; align-items: center; gap: 10px; font-family: 'Outfit'; text-transform: uppercase;}
+.req-id-badge { font-size: 11px; background: #222; padding: 4px 8px; border-radius: 4px; color: #888; font-family: monospace; letter-spacing: 0;}
+
+.req-detail-row { display: flex; gap: 20px; margin-bottom: 8px; color: var(--mc-text-muted); font-size: 12px; }
+.req-detail { display: flex; align-items: center; gap: 8px; }
+.req-icon { opacity: 0.6; font-size: 14px; }
+.req-pass { margin-top: 15px; padding-top: 15px; border-top: 1px dashed #333; color: #fff; font-family: monospace; font-size: 12px; }
+.pass-label { color: var(--mc-red); font-weight: 700; margin-right: 10px; text-transform: uppercase; font-size: 10px; letter-spacing: 0.05em; }
+
+/* Botones de Acción y Badges */
+.req-actions { display: flex; gap: 10px; flex-shrink: 0; }
+.btn-action { border: none; padding: 12px 20px; border-radius: 6px; font-weight: 800; cursor: pointer; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; transition: opacity 0.2s; }
+.btn-action:hover { opacity: 0.9; }
+.btn-approve { background: var(--mc-accent-green); color: #000; }
+.btn-reject { background: #333; color: #fff; }
+
+.status-badge { padding: 8px 16px; border-radius: 6px; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; }
+.status-active { background: rgba(205, 251, 62, 0.1); color: var(--mc-accent-green); border: 1px solid var(--mc-accent-green); }
+.status-rejected { background: rgba(255,255,255,0.05); color: #888; border: 1px solid #444; }
+
+
+/* --- SIDEBAR CARDS (Para Dashboard y Accesos) --- */
+.sidebar-card {
+    background: var(--mc-card-bg); border: 1px solid var(--mc-border); border-radius: 12px;
+    padding: 25px; margin-bottom: 30px;
+}
+
+/* Configuración Tickets */
+.config-item { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #222; }
+.config-item:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
+.config-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+.config-label { color: #fff; font-weight: 700; font-size: 14px; text-transform: uppercase; }
+
+.config-input {
+    width: 100%; background: #000; border: 1px solid #333; color: var(--mc-accent-green);
+    padding: 12px; font-size: 12px; font-family: monospace; border-radius: 6px; outline: none; transition: border-color 0.2s; box-sizing: border-box; /* Importante para padding */
+}
+.config-input:focus { border-color: #555; }
+.config-input::placeholder { color: #444; }
+
+/* Switch Toggle (Interruptor) */
+.switch { position: relative; display: inline-block; width: 46px; height: 24px; }
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #333; transition: .4s; border-radius: 34px; }
+.slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; }
+input:checked + .slider { background-color: var(--mc-accent-green); }
+input:checked + .slider:before { transform: translateX(22px); background-color: #000; }
+
+/* Botón Guardar (Imagen Hero) */
+.btn-save {
+    width: 100%; background: #fff; color: #000; border: none; padding: 12px;
+    font-weight: 800; cursor: pointer; font-size: 11px; border-radius: 6px;
+    text-transform: uppercase; letter-spacing: 0.05em; transition: opacity 0.2s; margin-top: 15px;
+}
+.btn-save:hover { opacity: 0.9; }
+.help-text { color: #666; font-size: 10px; margin-top: 12px; text-align: center; }
+
+
+/* --- ESTADOS DE CARGA / ERROR --- */
+.loading-state, .empty-state { text-align: center; padding: 60px 0; color: #666; font-style: italic; font-size: 13px; }
+.error-state { color: var(--mc-red); font-weight: 700; text-align: center; padding: 40px 0; font-size: 13px; }

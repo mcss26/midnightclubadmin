@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Midnight Admin — Cumpleaños</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin-styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <style>
+    /* Botón Volver */
+    .btn-back { text-decoration: none; color: #888; font-size: 12px; display: flex; align-items: center; gap: 5px; margin-bottom: 20px; font-weight: 600; }
+    .btn-back:hover { color: #fff; }
+    /* Ajuste layout */
+    .admin-container-single { max-width: 700px; margin: 90px auto 40px auto; padding: 0 20px; }
+    
+    /* Estilos específicos para esta vista (más grandes que en el sidebar) */
+    .bd-item-large { display: flex; align-items: center; gap: 20px; padding: 20px; background: var(--mc-card-bg); border: 1px solid var(--mc-border); border-radius: 12px; margin-bottom: 15px; }
+    .bd-date-box-large { display: flex; flex-direction: column; align-items: center; justify-content: center; background: rgba(232, 55, 47, 0.1); border: 1px solid var(--mc-red); width: 70px; height: 70px; border-radius: 8px; color: var(--mc-red); flex-shrink: 0; }
+    .bd-day-large { font-size: 11px; font-weight: 800; text-transform: uppercase; line-height: 1; margin-bottom: 4px; }
+    .bd-num-large { font-size: 28px; font-weight: 900; line-height: 1; }
+    .bd-info-large { flex: 1; }
+    .bd-name-large { color: #fff; font-weight: 800; font-size: 18px; margin-bottom: 5px; font-family: 'Outfit'; text-transform: uppercase; }
+    .bd-detail { color: #888; font-size: 12px; display: flex; gap: 15px; }
+    
+    /* Botón Promo */
+    .btn-send-promo-large {
+        background: var(--mc-red); border: none; color: #fff;
+        padding: 12px 20px; font-size: 12px; font-weight: 800;
+        border-radius: 6px; cursor: pointer; text-transform: uppercase; letter-spacing: 0.05em;
+        display: flex; align-items: center; gap: 8px; transition: all 0.2s;
+    }
+    .btn-send-promo-large:hover:not(:disabled) { opacity: 0.9; transform: translateY(-2px); }
+    .btn-send-promo-large:disabled { background: #333; color: #888; cursor: not-allowed; transform: none; }
+    .btn-send-promo-large.sent { background: var(--mc-accent-green); color: #000; pointer-events: none; }
+  </style>
+</head>
+<body>
+
+  <header class="admin-header">
+    <div class="admin-logo">MIDNIGHT<span style="color: var(--mc-red);">ADMIN</span> / CUMPLEAÑOS</div>
+    <button onclick="logout()" class="btn-logout">CERRAR SESIÓN</button>
+  </header>
+
+  <div class="admin-container-single">
+    <main>
+      <a href="admin.html" class="btn-back">← Volver al Dashboard</a>
+
+      <div class="section-header">
+        <h2 class="section-title">Cumpleaños de la Semana</h2>
+        <span style="color: #888; font-size: 12px; font-weight: 600;">Lunes a Domingo</span>
+      </div>
+
+      <div id="birthday-list-large">
+        <div class="loading-state">Calculando fechas...</div>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    // === CONFIGURACIÓN (¡COMPLETAR!) ===
+    const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
+    // 👇👇👇 PEGA TU CLAVE SUPABASE AQUÍ 👇👇👇
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258'; 
+
+    // 👇👇👇 PEGA TUS CLAVES EMAILJS AQUÍ 👇👇👇
+    const EMAILJS_PUBLIC_KEY = "FaYbPCI_5oJSsC9g4";
+    const EMAILJS_SERVICE_ID = "service_j7h80jk";
+    const EMAILJS_TEMPLATE_CUMPLE = "template_rmkp7zo"; 
+
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    (function(){ try { emailjs.init(EMAILJS_PUBLIC_KEY); } catch(e) { console.error("Error EmailJS:", e); } })();
+
+    window.addEventListener('load', loadWeeklyBirthdays);
+    function logout() { window.location.href = "index.html"; }
+
+
+    // --- LÓGICA CUMPLEAÑOS ---
+    async function loadWeeklyBirthdays() {
+      const container = document.getElementById('birthday-list-large');
+      
+      // 1. Calcular fechas Lunes-Domingo
+      const today = new Date();
+      const currentDay = today.getDay(); 
+      const dayAdjusted = currentDay === 0 ? 7 : currentDay;
+      const monday = new Date(today); monday.setDate(today.getDate() - (dayAdjusted - 1)); monday.setHours(0,0,0,0);
+      const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); sunday.setHours(23,59,59,999);
+      
+      // 2. Obtener miembros ACTIVOS
+      const { data: members, error } = await client.from('members')
+        .select('id, nombre, member_id, nacimiento, email, telefono, instagram')
+        .eq('status', 'activo');
+
+      if (error || !members) { container.innerHTML = '<div class="error-state">Error al cargar datos.</div>'; return; }
+
+      // 3. Filtrar en JS
+      const upcomingBirthdays = members.filter(member => {
+        if (!member.nacimiento || member.nacimiento.length < 5) return false;
+        let birthMonth, birthDay;
+        if (member.nacimiento.includes('-')) {
+           const parts = member.nacimiento.split('-'); birthMonth = parseInt(parts[1], 10) - 1; birthDay = parseInt(parts[2], 10);
+        } else if (member.nacimiento.includes('/')) {
+           const parts = member.nacimiento.split('/'); birthMonth = parseInt(parts[1], 10) - 1; birthDay = parseInt(parts[0], 10);
+        } else return false;
+        const bdayThisYear = new Date(today.getFullYear(), birthMonth, birthDay);
+        return bdayThisYear >= monday && bdayThisYear <= sunday;
+      });
+
+      // 4. Renderizar
+      if (upcomingBirthdays.length === 0) { container.innerHTML = '<div class="empty-state" style="padding: 40px;">No hay cumpleaños esta semana.</div>'; return; }
+
+      upcomingBirthdays.sort((a, b) => {
+         const getDay = (dateStr) => parseInt(dateStr.includes('-') ? dateStr.split('-')[2] : dateStr.split('/')[0], 10);
+         return getDay(a.nacimiento) - getDay(b.nacimiento);
+      });
+
+      let html = '';
+      const daysFull = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO'];
+
+      upcomingBirthdays.forEach(member => {
+        let birthMonth, birthDay;
+        if (member.nacimiento.includes('-')) {
+           const parts = member.nacimiento.split('-'); birthMonth = parseInt(parts[1],10)-1; birthDay = parseInt(parts[2],10);
+        } else {
+           const parts = member.nacimiento.split('/'); birthMonth = parseInt(parts[1],10)-1; birthDay = parseInt(parts[0],10);
+        }
+        const bdayDate = new Date(today.getFullYear(), birthMonth, birthDay);
+        const dayName = daysFull[bdayDate.getDay()];
+        const safeName = member.nombre.replace(/'/g, "\\'");
+        const safeEmail = member.email || '';
+
+        html += `
+          <div class="bd-item-large">
+            <div class="bd-date-box-large">
+              <span class="bd-day-large">${dayName}</span>
+              <span class="bd-num-large">${birthDay}</span>
+            </div>
+            <div class="bd-info-large">
+              <div class="bd-name-large">${member.nombre}</div>
+              <div class="bd-detail">
+                <span>ID: ${member.member_id || '--'}</span>
+                <span>IG: @${member.instagram || '--'}</span>
+                <span>📱 ${member.telefono || '--'}</span>
+              </div>
+            </div>
+            <div>
+               <button class="btn-send-promo-large" onclick="sendBirthdayPromo('${safeEmail}', '${safeName}', this)">
+                 🎁 Enviar Pack Cumple
+               </button>
+            </div>
+          </div>`;
+      });
+      container.innerHTML = html;
+    }
+
+    // Función: Enviar Promo
+    async function sendBirthdayPromo(email, name, btnElement) {
+        if (!email || email.length < 5 || !email.includes('@')) { alert("Este usuario no tiene un email válido."); return; }
+        if (!confirm(`¿Enviar la propuesta de cumpleaños a ${name}?`)) return;
+        
+        const originalHtml = btnElement.innerHTML;
+        btnElement.innerHTML = "Enviando..."; btnElement.disabled = true;
+        
+        const templateParams = { to_name: name, to_email: email };
+        
+        emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_CUMPLE, templateParams)
+            .then(() => {
+                btnElement.innerHTML = "¡Promo Enviada! ✅";
+                btnElement.classList.add('sent');
+            }, (err) => {
+                console.error("Error EmailJS:", err); alert("Error al enviar el correo.");
+                btnElement.innerHTML = originalHtml; btnElement.disabled = false;
+            });
+    }
+  </script>
+</body>
+</html>
