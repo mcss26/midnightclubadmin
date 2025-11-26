@@ -240,344 +240,237 @@
 
 
 
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <script>
-
-    // === CONFIGURACIONES CLAVE ===
-
+    // --- CONFIGURACIÓN INICIAL ---
     const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
+    // 👇👇👇 ¡PEGA TU CLAVE SUPABASE AQUÍ! 👇👇👇
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258'; 
 
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258'; // <--- TU CLAVE DE SUPABASE
+    // --- CONFIGURACIÓN EMAILJS (¡AHORA SON 4 CLAVES!) ---
+    const EMAILJS_PUBLIC_KEY = "FaYbPCI_5oJSsC9g4";
+    const EMAILJS_SERVICE_ID = "service_j7h80jk";
+    // Template para Cumpleaños
+    const EMAILJS_TEMPLATE_CUMPLE = "template_rmkp7zo"; 
+    // 👇👇👇 NUEVO: Template para Aprobación de Socio 👇👇👇
+    const EMAILJS_TEMPLATE_APROBADO = "template_l425bfo"; 
 
-    
 
-    // CONFIGURACIÓN DE EMAILJS
-
-    const EMAILJS_PUBLIC_KEY = "FaYbPCI_5oJSsC9g4"; // <--- TU CLAVE DE EMAILJS
-
-    const EMAILJS_SERVICE_ID = "service_j7h80jk";         // <--- TU SERVICE ID
-
-    const EMAILJS_TEMPLATE_ID = "template_l425bfo";       // <--- TU TEMPLATE ID
-
-    
-
+    // Inicializar clientes
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    const ADMIN_PASS = "admin"; 
-
-
-
-    let ALL_MEMBERS = [];
-
-    let CURRENT_HERO_URL = 'hero.jpg';
-
-
-
-    // INICIALIZAR EMAILJS
-
     (function(){
-
-        emailjs.init(EMAILJS_PUBLIC_KEY);
-
+      try { emailjs.init(EMAILJS_PUBLIC_KEY); } catch(e) { console.error("Error init EmailJS:", e); }
     })();
-
-
-
-    // LOGIN
-
-    function login() {
-
-      if(document.getElementById('passInput').value === ADMIN_PASS) {
-
-        document.getElementById('login-overlay').style.display = 'none';
-
-        document.getElementById('dashboard').style.display = 'block';
-
-        loadAll();
-
-      } else alert("Error");
-
-    }
-
-
-
-    function loadAll() { loadConfig(); loadRequests(); }
-
-
-
-    // === 1. GENERADOR DE FLYER ===
-
-    async function generateFlyer() {
-
-      const statusTxt = document.getElementById('flyerStatus'); statusTxt.innerText = "Generando...";
-
-      const canvas = document.getElementById('flyerCanvas'); const ctx = canvas.getContext('2d');
-
-      const dateText = document.getElementById('flyerDate').value.toUpperCase() || "FECHA";
-
-      const djText = document.getElementById('flyerDJ').value.toUpperCase() || "DJ GUEST";
-
-      const loadImage = (src) => new Promise((resolve, reject) => {
-
-        const img = new Image(); img.crossOrigin = "Anonymous"; img.onload = () => resolve(img); img.onerror = () => reject(new Error(`Error: ${src}`)); img.src = src;
-
-      });
-
-      try {
-
-        const [heroImg, templateImg] = await Promise.all([ loadImage(CURRENT_HERO_URL), loadImage('templates/tpl-base.png') ]);
-
-        const scale = Math.max(canvas.width / heroImg.width, canvas.height / heroImg.height);
-
-        const x = (canvas.width / 2) - (heroImg.width / 2) * scale; const y = (canvas.height / 2) - (heroImg.height / 2) * scale;
-
-        ctx.drawImage(heroImg, x, y, heroImg.width * scale, heroImg.height * scale);
-
-        ctx.drawImage(templateImg, 0, 0, canvas.width, canvas.height);
-
-        ctx.fillStyle = "#E8372F"; ctx.textAlign = "center"; 
-
-        ctx.font = "900 38px 'Inter'"; ctx.fillText("DJ GUEST — " + djText, canvas.width / 2, 1720); 
-
-        ctx.font = "900 80px 'Inter'"; ctx.fillText(dateText, canvas.width / 2, 1820); 
-
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
-
-        document.getElementById('finalFlyer').src = dataUrl; document.getElementById('finalFlyer').style.display = 'block';
-
-        const dlBtn = document.getElementById('downloadFlyer'); dlBtn.href = dataUrl; dlBtn.download = `Flyer-${dateText}.jpg`; dlBtn.style.display = 'inline-block';
-
-        statusTxt.innerText = "¡Flyer generado!";
-
-      } catch (error) { console.error(error); statusTxt.innerText = "Error: Verifica que 'templates/tpl-base.png' exista."; }
-
-    }
-
-    async function saveFlyerTexts() {
-
-      const date = document.getElementById('flyerDate').value; const dj = document.getElementById('flyerDJ').value;
-
-      await client.from('site_config').upsert({ key: 'flyer_fecha', value: date }); await client.from('site_config').upsert({ key: 'flyer_dj', value: dj });
-
-      alert("Textos guardados.");
-
-    }
-
-
-
-    // === 2. CONFIGURACIÓN ===
-
-    async function loadConfig() {
-
-      const container = document.getElementById('config-list');
-
-      const { data } = await client.from('site_config').select('*');
-
-      container.innerHTML = '';
-
-      data.forEach(conf => {
-
-        if(conf.key === 'hero_image') {
-
-            CURRENT_HERO_URL = conf.value !== 'default' ? conf.value : 'hero.jpg';
-
-            document.getElementById('preview-img').src = CURRENT_HERO_URL;
-
-            document.getElementById('preview-img').style.display = 'block';
-
-        } else if (conf.key === 'flyer_fecha') document.getElementById('flyerDate').value = conf.value;
-
-        else if (conf.key === 'flyer_dj') document.getElementById('flyerDJ').value = conf.value;
-
-        else {
-
-            container.innerHTML += `<div class="config-card"><div class="config-header"><span style="font-weight:700">${conf.value}</span><button onclick="toggleStatus('${conf.key}', ${conf.is_active})" class="status-badge ${conf.is_active ? 'status-active' : 'status-soldout'}">${conf.is_active ? 'DISPONIBLE' : 'AGOTADO'}</button></div><div class="url-group"><input type="text" id="url_${conf.key}" class="url-input" value="${conf.url || ''}" placeholder="Link..."><button class="btn-save-url" onclick="saveUrl('${conf.key}')">💾</button></div></div>`;
-
-        }
-
-      });
-
-    }
-
-    async function toggleStatus(key, curr) { await client.from('site_config').update({ is_active: !curr }).eq('key', key); loadConfig(); }
-
-    async function saveUrl(key) { const newUrl = document.getElementById(`url_${key}`).value; await client.from('site_config').update({ url: newUrl }).eq('key', key); alert("Link guardado"); }
-
     
+    let currentFilter = 'pendiente';
 
-    // === 3. HERO UPLOAD ===
-
-    const fileInput = document.getElementById('fileInput'); const previewImg = document.getElementById('preview-img'); const btnSaveHero = document.getElementById('btnSaveHero');
-
-    let fileToUpload = null;
-
-    fileInput.addEventListener('change', (e) => { const file = e.target.files[0]; if (file) { fileToUpload = file; previewImg.src = URL.createObjectURL(file); previewImg.style.display = 'block'; btnSaveHero.style.display = 'inline-block'; } });
-
-    async function uploadHero() {
-
-      if (!fileToUpload) return; btnSaveHero.textContent = "SUBIENDO...";
-
-      const fileName = `hero-${Date.now()}.jpg`; await client.storage.from('content').upload(fileName, fileToUpload);
-
-      const { data: publicUrl } = client.storage.from('content').getPublicUrl(fileName);
-
-      await client.from('site_config').update({ value: publicUrl.publicUrl }).eq('key', 'hero_image');
-
-      alert("Portada actualizada!"); btnSaveHero.style.display = 'none'; loadConfig();
-
-    }
-
-
-
-    // === 4. MIEMBROS & EMAILJS ===
-
-    function formatInstagram(user) { let cleanUser = user.trim().replace('@', ''); if(cleanUser.includes('instagram.com')) return cleanUser; return `https://instagram.com/${cleanUser}`; }
-
-    async function loadRequests() {
-
-      document.getElementById('requests-list').innerHTML = 'Cargando...';
-
-      const { data } = await client.from('members').select('*').order('created_at', { ascending: false });
-
-      ALL_MEMBERS = data; renderMembers(ALL_MEMBERS);
-
-    }
-
-    function renderMembers(dataList) {
-
-      const list = document.getElementById('requests-list'); list.innerHTML = '';
-
-      if (dataList.length === 0) { list.innerHTML = '<p style="color:#666; text-align:center;">No hay resultados.</p>'; return; }
-
-      dataList.forEach((m) => {
-
-        const originalIndex = ALL_MEMBERS.findIndex(x => x.id === m.id); const number = originalIndex + 1; 
-
-        const isOk = m.status === 'activo'; const instaLink = formatInstagram(m.instagram);
-
-        // Pasamos todos los datos necesarios al botón de aprobar
-
-        list.innerHTML += `
-
-          <div class="req-card ${isOk ? 'approved' : ''}">
-
-            <div class="req-number">#${number}</div>
-
-            <div class="req-content"><div class="req-info"><strong>${m.nombre}</strong><br><a href="${instaLink}" target="_blank">@${m.instagram.replace('@','')}</a><br><small style="color:#666">${m.nacimiento} | ${m.telefono} | ${m.email}</small>${isOk ? `<br><span style="color:#cdfb3e; font-size:11px;">ID: ${m.member_id}</span>` : ''}</div></div>
-
-            <div class="action-group">${!isOk ? `<button class="btn-action" onclick="approve('${m.id}', '${m.nombre}', '${m.email}')">APROBAR</button>` : ''}<button class="btn-delete" onclick="deleteMember(${m.id})">✕</button></div>
-
-          </div>`;
-
-      });
-
-    }
-
-    document.getElementById('searchMembers').addEventListener('input', (e) => {
-
-      const term = e.target.value.toLowerCase();
-
-      if (term === '') { renderMembers(ALL_MEMBERS); return; }
-
-      const filtered = ALL_MEMBERS.filter(m => (m.nombre && m.nombre.toLowerCase().includes(term)) || (m.instagram && m.instagram.toLowerCase().includes(term)) || (m.email && m.email.toLowerCase().includes(term)) || (m.telefono && m.telefono.includes(term)) || (m.member_id && m.member_id.toLowerCase().includes(term)));
-
-      renderMembers(filtered);
-
+    window.addEventListener('load', () => {
+      checkAdminAuth(); setupFilters(); loadRequests(currentFilter);
+      loadConfig(); loadHeroImage(); loadWeeklyBirthdays();
     });
 
-    function openBulkInstagrams() {
 
-      const from = parseInt(document.getElementById('instaFrom').value); const to = parseInt(document.getElementById('instaTo').value);
-
-      if (!from || !to || from > to) { alert("Rango inválido"); return; }
-
-      let delay = 0;
-
-      for (let i = from - 1; i < to; i++) {
-
-        if (ALL_MEMBERS[i]) { const url = formatInstagram(ALL_MEMBERS[i].instagram); setTimeout(() => { window.open(url, '_blank'); }, delay); delay += 300; }
-
-      }
-
+    // --- SEGURIDAD ---
+    function checkAdminAuth() {
+      const secret = prompt("Acceso Administrativo. Ingrese clave maestra:");
+      if (secret !== "midnight2026") window.location.href = "index.html"; // CLAVE TEMPORAL
     }
+    function logout() { if(confirm("¿Cerrar sesión?")) window.location.href = "index.html"; }
 
 
-
-    // === APROBAR CON ENVÍO DE EMAIL ===
-
-    window.approve = async (id, nombre, emailUser) => {
-
-      if(!confirm(`¿Aprobar a ${nombre} y enviar correo?`)) return;
-
-
-
-      const newID = "MC-" + Math.floor(1000 + Math.random() * 9000);
-
-      const newPass = Math.random().toString(36).slice(-5).toUpperCase();
-
-
-
-      // 1. Guardar en Supabase
-
-      const { error } = await client.from('members').update({ status: 'activo', member_id: newID, access_password: newPass }).eq('id', id);
-
-
-
-      if(error) {
-
-        alert("Error guardando en base de datos: " + error.message);
-
-        return;
-
-      }
-
-
-
-      // 2. Enviar Email con EmailJS
-
-      alert("Usuario aprobado. Enviando correo...");
-
-      
-
-      const templateParams = {
-
-        to_name: nombre,
-
-        to_email: emailUser,
-
-        member_id: newID,
-
-        member_pass: newPass
-
-      };
-
-
-
-      emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, templateParams)
-
-        .then(function(response) {
-
-           console.log('SUCCESS!', response.status, response.text);
-
-           alert("✅ Correo enviado correctamente a " + emailUser);
-
-           loadRequests();
-
-        }, function(error) {
-
-           console.log('FAILED...', error);
-
-           alert("⚠️ El usuario fue aprobado pero el correo FALLÓ. Revisa la configuración de EmailJS.");
-
-           loadRequests();
-
+    // --- 1. FILTROS ---
+    function setupFilters() {
+      const chips = document.querySelectorAll('.filter-chip');
+      chips.forEach(chip => {
+        chip.addEventListener('click', () => {
+          chips.forEach(c => c.classList.remove('active')); chip.classList.add('active');
+          currentFilter = chip.dataset.status; loadRequests(currentFilter);
         });
-
+      });
     }
 
 
+    // --- 2. GESTIÓN DE SOLICITUDES (ACTUALIZADO PARA ENVIAR MAIL) ---
+    async function loadRequests(statusFilter) {
+      const listContainer = document.getElementById('requests-list');
+      listContainer.innerHTML = '<div class="loading-state">Actualizando datos...</div>';
 
-    window.deleteMember = async (id) => { if(!confirm("⚠️ ¿Borrar?")) return; await client.from('members').delete().eq('id', id); loadRequests(); }
+      let query = client.from('members').select('*').order('created_at', { ascending: false });
+      if (statusFilter !== 'all') query = query.eq('status', statusFilter);
 
+      const { data: requests, error } = await query;
+      if (error) { listContainer.innerHTML = `<div class="error-state">Error: ${error.message}</div>`; return; }
+      if (!requests || requests.length === 0) { listContainer.innerHTML = '<div class="empty-state">No hay solicitudes.</div>'; return; }
+
+      let html = '';
+      requests.forEach(req => {
+        let rightPanel = ''; let borderColor = '';
+        // Escapar nombres con comillas simples para evitar errores de JS
+        const safeName = req.nombre ? req.nombre.replace(/'/g, "\\'") : 'Usuario';
+        const safeEmail = req.email || '';
+        const safeMemberID = req.member_id || '';
+
+        if (req.status === 'pendiente') {
+            borderColor = 'var(--mc-red)';
+            // SE ACTUALIZARON LOS PARÁMETROS QUE SE PASAN A 'procesar'
+            rightPanel = `
+              <div class="req-actions">
+                <button class="btn-action btn-approve" onclick="procesar('${req.id}', 'activo', '${safeName}', '${safeEmail}', '${safeMemberID}')">APROBAR</button>
+                <button class="btn-action btn-reject" onclick="procesar('${req.id}', 'rechazado')">RECHAZAR</button>
+              </div>`;
+        } else if (req.status === 'activo') {
+            borderColor = 'var(--mc-accent-green)';
+            rightPanel = `<span class="status-badge status-active">ACTIVO ✅</span>`;
+        } else {
+             borderColor = '#666';
+             rightPanel = `<span class="status-badge status-rejected">RECHAZADO ❌</span>`;
+        }
+
+        html += `
+          <div class="request-card" style="border-left: 4px solid ${borderColor}">
+            <div class="req-info">
+              <h3>${req.nombre} <span class="req-id-badge">${req.member_id || 'Sin ID'}</span></h3>
+              <div class="req-detail-row"><span class="req-detail"><span class="req-icon">🎂</span> ${req.nacimiento || '—'}</span><span class="req-detail"><span class="req-icon">📱</span> ${req.telefono}</span></div>
+              <div class="req-detail-row"><span class="req-detail"><span class="req-icon">📸</span> ${req.instagram}</span><span class="req-detail"><span class="req-icon">📧</span> ${req.email}</span></div>
+              <div class="req-pass"><span class="pass-label">ACCESO INICIAL:</span> ${req.access_password || '—'}</div>
+            </div>
+            ${rightPanel}
+          </div>`;
+      });
+      listContainer.innerHTML = html;
+    }
+
+    // --- FUNCIÓN PROCESAR ACTUALIZADA (ENVÍA MAIL AL APROBAR) ---
+    async function procesar(id, nuevoEstado, nombre, email, memberId) {
+      document.body.style.cursor = 'wait';
+      
+      // 1. Actualizar en Supabase
+      const { error } = await client.from('members').update({ status: nuevoEstado }).eq('id', id);
+      
+      document.body.style.cursor = 'default';
+
+      if(error) { 
+        alert("Error DB: " + error.message); 
+      } else { 
+        // 2. Si se aprobó, enviar email de bienvenida en segundo plano
+        if (nuevoEstado === 'activo' && email && email.includes('@')) {
+           console.log("Enviando email de aprobación a: " + email);
+           const templateParams = {
+              to_name: nombre,
+              to_email: email,
+              member_id: memberId || 'Pendiente',
+              login_url: 'https://midnightclub.biz' // <--- CAMBIA ESTO SI TU URL ES OTRA
+           };
+           // No esperamos a que termine el envío para no trabar el admin (fire and forget)
+           emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_APROBADO, templateParams)
+             .catch(err => console.error("Error enviando mail de aprobación:", err));
+        }
+
+        // 3. Recargar lista
+        loadRequests(currentFilter); 
+      }
+    }
+
+
+    // --- 3. WIDGET CUMPLEAÑOS (CON BOTÓN PROMO) ---
+    async function loadWeeklyBirthdays() {
+      const bdList = document.getElementById('birthday-list');
+      const today = new Date(); const currentDay = today.getDay(); 
+      const dayAdjusted = currentDay === 0 ? 7 : currentDay;
+      const monday = new Date(today); monday.setDate(today.getDate() - (dayAdjusted - 1)); monday.setHours(0,0,0,0);
+      const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); sunday.setHours(23,59,59,999);
+      
+      const { data: members, error } = await client.from('members').select('id, nombre, member_id, nacimiento, email').eq('status', 'activo');
+      if (error || !members) { bdList.innerHTML = '<li class="no-birthdays">Error al cargar fechas.</li>'; return; }
+
+      const upcomingBirthdays = members.filter(member => {
+        if (!member.nacimiento || member.nacimiento.length < 5) return false;
+        let birthMonth, birthDay;
+        if (member.nacimiento.includes('-')) {
+           const parts = member.nacimiento.split('-'); birthMonth = parseInt(parts[1], 10) - 1; birthDay = parseInt(parts[2], 10);
+        } else if (member.nacimiento.includes('/')) {
+           const parts = member.nacimiento.split('/'); birthMonth = parseInt(parts[1], 10) - 1; birthDay = parseInt(parts[0], 10);
+        } else return false;
+        const bdayThisYear = new Date(today.getFullYear(), birthMonth, birthDay);
+        return bdayThisYear >= monday && bdayThisYear <= sunday;
+      });
+
+      if (upcomingBirthdays.length === 0) { bdList.innerHTML = '<li class="no-birthdays">No hay cumpleaños esta semana.</li>'; return; }
+
+      upcomingBirthdays.sort((a, b) => {
+         const getDay = (dateStr) => parseInt(dateStr.includes('-') ? dateStr.split('-')[2] : dateStr.split('/')[0], 10);
+         return getDay(a.nacimiento) - getDay(b.nacimiento);
+      });
+
+      let html = ''; const daysShort = ['DOM', 'LUN', 'MAR', 'MIÉ', 'JUE', 'VIE', 'SÁB'];
+      upcomingBirthdays.forEach(member => {
+        let birthMonth, birthDay;
+        if (member.nacimiento.includes('-')) {
+           const parts = member.nacimiento.split('-'); birthMonth = parseInt(parts[1],10)-1; birthDay = parseInt(parts[2],10);
+        } else {
+           const parts = member.nacimiento.split('/'); birthMonth = parseInt(parts[1],10)-1; birthDay = parseInt(parts[0],10);
+        }
+        const bdayDate = new Date(today.getFullYear(), birthMonth, birthDay);
+        const dayName = daysShort[bdayDate.getDay()];
+        const safeName = member.nombre.replace(/'/g, "\\'");
+        const safeEmail = member.email || '';
+
+        html += `
+          <li class="bd-item">
+            <div class="bd-date-box"><span class="bd-day">${dayName}</span><span class="bd-num">${birthDay}</span></div>
+            <div><div class="bd-name">${member.nombre}</div><div class="bd-id">${member.member_id || 'Sin ID'}</div></div>
+            <div style="margin-left: auto;"><button class="btn-send-promo" onclick="sendBirthdayPromo('${safeEmail}', '${safeName}', this)">🎁 Enviar Promo</button></div>
+          </li>`;
+      });
+      bdList.innerHTML = html;
+    }
+
+    // Función: Enviar Promo Cumpleaños
+    async function sendBirthdayPromo(email, name, btnElement) {
+        if (!email || email.length < 5 || !email.includes('@')) { alert("Este usuario no tiene un email válido."); return; }
+        if (!confirm(`¿Enviar la propuesta de cumpleaños a ${name}?`)) return;
+        const originalText = btnElement.innerHTML;
+        btnElement.textContent = "Enviando..."; btnElement.disabled = true;
+        const templateParams = { to_name: name, to_email: email };
+        emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_CUMPLE, templateParams)
+            .then(() => { btnElement.textContent = "¡Enviado! ✅"; btnElement.classList.add('sent'); }, 
+                  (err) => { console.error(err); alert("Error al enviar."); btnElement.innerHTML = originalText; btnElement.disabled = false; });
+    }
+
+
+    // --- 4. CONFIGURACIÓN DEL SITIO ---
+    async function loadConfig() {
+      const container = document.getElementById('config-list');
+      const { data: configs, error } = await client.from('site_config').select('*').order('id');
+      if (error) { container.innerHTML = '<div class="error-state" style="font-size:12px;">Error config DB</div>'; return; }
+      let html = '';
+      configs.forEach(conf => {
+        if(conf.key.startsWith('access_') || conf.key.startsWith('mem_')) {
+           html += `
+            <div class="config-item">
+              <div class="config-header">
+                <span class="config-label">${conf.label}</span>
+                <label class="switch"><input type="checkbox" ${conf.is_active ? 'checked' : ''} onchange="toggleConfig('${conf.key}', this.checked)"><span class="slider"></span></label>
+              </div>
+              <input type="text" class="config-input" value="${conf.url || ''}" onchange="updateConfigUrl('${conf.key}', this.value)" placeholder="Pegar URL de Passline aquí...">
+            </div>`;
+        }
+      });
+      container.innerHTML = html || '<div class="empty-state">Sin configuraciones.</div>';
+    }
+    async function toggleConfig(key, isActive) { await client.from('site_config').update({ is_active: isActive }).eq('key', key); }
+    async function updateConfigUrl(key, newUrl) { await client.from('site_config').update({ url: newUrl }).eq('key', key); }
+    async function loadHeroImage() {
+      const { data } = await client.from('site_config').select('value').eq('key', 'hero_image').single();
+      if(data) document.getElementById('heroImgInput').value = data.value;
+    }
+    async function saveHeroImage() {
+      const btn = document.querySelector('.btn-save'); btn.textContent = "GUARDANDO..."; btn.disabled = true;
+      const url = document.getElementById('heroImgInput').value.trim();
+      const finalUrl = (url === '' || url.toLowerCase() === 'default') ? 'default' : url;
+      await client.from('site_config').update({ value: finalUrl }).eq('key', 'hero_image');
+      btn.textContent = "¡GUARDADO!"; setTimeout(() => { btn.textContent = "GUARDAR IMAGEN"; btn.disabled = false; }, 2000);
+    }
   </script>
 
 </body>

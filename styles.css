@@ -120,3 +120,43 @@ body {
 }
 .insta-input { background: #000; border: 1px solid #444; color: #fff; padding: 8px; width: 60px; text-align: center; font-weight: 700; }
 .btn-bulk { background: #fff; color: #000; border: none; padding: 8px 15px; font-weight: 800; cursor: pointer; font-size: 12px; flex: 1; }
+
+/* === NUEVO: Botón Promo Cumpleaños === */
+
+/* Ajuste para el ítem de la lista */
+.bd-item {
+    /* Asegura que los elementos estén centrados verticalmente */
+    align-items: center;
+}
+
+/* Estilo del botón */
+.btn-send-promo {
+    background: transparent;
+    border: 1px solid var(--mc-red);
+    color: var(--mc-red);
+    padding: 6px 12px;
+    font-size: 10px;
+    font-weight: 800;
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    white-space: nowrap; /* Que el texto no se rompa en dos líneas */
+    transition: all 0.2s ease;
+}
+
+.btn-send-promo:hover:not(:disabled) {
+    background: var(--mc-red);
+    color: #fff;
+}
+
+.btn-send-promo:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Estilo de éxito (cuando ya se envió) */
+.btn-send-promo.sent {
+    border-color: var(--mc-accent-green);
+    color: var(--mc-accent-green);
+    pointer-events: none; /* Deshabilita clicks */
+}
