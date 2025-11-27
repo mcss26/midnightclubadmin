@@ -157,17 +157,87 @@
         window.location.reload();
     }
 
-    // CONTADORES
+    /// --- CONTADORES DEL DASHBOARD (CORREGIDOS) ---
     async function loadDashboardCounts() {
-       const { count: pendingCount } = await client.from('members').select('*', { count: 'exact', head: true }).eq('status', 'pendiente');
-       document.getElementById('count-pending').textContent = pendingCount || '0';
-       const { count: ticketCount } = await client.from('site_config').select('*', { count: 'exact', head: true }).eq('is_active', true).like('key', 'access_%');
-       document.getElementById('count-active-tickets').textContent = ticketCount || '0';
-       const { count: menuCount } = await client.from('menu_items').select('*', { count: 'exact', head: true }).eq('is_active', true);
-       document.getElementById('count-menu').textContent = menuCount || '0';
-       
-       // Cumples (placeholder visual para no cargar lógica pesada en dash)
-       document.getElementById('count-birthdays').textContent = '-'; 
+        try {
+            // A. Solicitudes Pendientes
+            const { count: pendingCount } = await client
+                .from('members')
+                .select('*', { count: 'exact', head: true })
+                .eq('status', 'pendiente');
+            document.getElementById('count-pending').textContent = pendingCount || '0';
+
+            // B. Tickets Activos (Públicos)
+            // Filtramos específicamente las claves de tickets públicos activos
+            const { count: ticketCount } = await client
+                .from('site_config')
+                .select('*', { count: 'exact', head: true })
+                .eq('is_active', true)
+                .or('key.eq.access_0000,key.eq.access_plus'); 
+            document.getElementById('count-active-tickets').textContent = ticketCount || '0';
+
+            // C. Carta (Items Activos)
+            const { count: menuCount } = await client
+                .from('menu_items')
+                .select('*', { count: 'exact', head: true })
+                .eq('is_active', true);
+            document.getElementById('count-menu').textContent = menuCount || '0';
+
+            // D. Cumpleaños de la Semana (Lógica JavaScript)
+            // Traemos solo fechas de miembros ACTIVOS
+            const { data: members } = await client
+                .from('members')
+                .select('nacimiento')
+                .eq('status', 'activo');
+            
+            if (members) {
+                const today = new Date();
+                
+                // Calcular Lunes y Domingo de esta semana
+                const currentDay = today.getDay(); // 0=Domingo, 1=Lunes...
+                const dayAdjusted = currentDay === 0 ? 7 : currentDay; // Ajustar para que Domingo sea 7
+                
+                const monday = new Date(today); 
+                monday.setDate(today.getDate() - (dayAdjusted - 1)); 
+                monday.setHours(0,0,0,0);
+                
+                const sunday = new Date(monday); 
+                sunday.setDate(monday.getDate() + 6); 
+                sunday.setHours(23,59,59,999);
+
+                let bdayCount = 0;
+
+                members.forEach(m => {
+                    if (!m.nacimiento || m.nacimiento.length < 5) return;
+                    
+                    let bMonth, bDay;
+                    // Soporte para DD-MM-AAAA o DD/MM/AAAA
+                    if (m.nacimiento.includes('-')) { 
+                        const p = m.nacimiento.split('-'); 
+                        bMonth = parseInt(p[1],10) - 1; 
+                        bDay = parseInt(p[2],10); 
+                    } else if (m.nacimiento.includes('/')) { 
+                        const p = m.nacimiento.split('/'); 
+                        bMonth = parseInt(p[1],10) - 1; 
+                        bDay = parseInt(p[0],10); 
+                    } else return;
+
+                    // Crear fecha de cumple para ESTE AÑO
+                    const bdayThisYear = new Date(today.getFullYear(), bMonth, bDay);
+                    
+                    // Comparar
+                    if (bdayThisYear >= monday && bdayThisYear <= sunday) {
+                        bdayCount++;
+                    }
+                });
+                
+                document.getElementById('count-birthdays').textContent = bdayCount;
+            } else {
+                document.getElementById('count-birthdays').textContent = '0';
+            }
+        } catch (err) {
+            console.error("Error cargando dashboard:", err);
+        }
     }
   </script>
 </body>
