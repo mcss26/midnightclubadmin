@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Midnight Admin — Carta</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin-styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* Estilos Específicos Carta */
+    .menu-grid { display: grid; gap: 15px; }
+    
+    .menu-item-card {
+      background: #111; border: 1px solid #333; padding: 15px; border-radius: 8px;
+      display: flex; justify-content: space-between; align-items: center;
+    }
+    .item-left { display: flex; gap: 15px; align-items: center; }
+    .item-index { 
+        font-family: 'Outfit'; color: #444; font-size: 24px; font-weight: 900; 
+        width: 30px; text-align: right; 
+    }
+    .item-info h4 { margin: 0; color: #fff; font-size: 14px; text-transform: uppercase; }
+    .item-info p { margin: 4px 0 0; color: #888; font-size: 11px; }
+    .item-cat-badge { 
+        font-size: 9px; padding: 2px 6px; border-radius: 4px; background: #222; 
+        color: #aaa; text-transform: uppercase; margin-right: 5px; 
+    }
+
+    .item-actions { display: flex; align-items: center; gap: 15px; }
+    .price-input {
+        background: #000; border: 1px solid #333; color: var(--mc-accent-green);
+        padding: 8px; width: 80px; text-align: right; font-family: monospace; font-weight: 700;
+        border-radius: 4px; outline: none;
+    }
+    .btn-edit { background: #333; color: #fff; border: none; padding: 8px; border-radius: 4px; cursor: pointer; }
+    .btn-create { background: var(--mc-red); color: #fff; border: none; padding: 10px 20px; font-weight: 800; border-radius: 4px; cursor: pointer; text-transform: uppercase; }
+
+    /* Modal */
+    .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 200; display:none; justify-content:center; align-items:center; }
+    .modal-box { background: #111; border: 1px solid #444; padding: 30px; width: 90%; max-width: 400px; border-radius: 12px; }
+    .modal-input { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 12px; margin-bottom: 15px; outline: none; }
+    .modal-select { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 12px; margin-bottom: 15px; outline: none; }
+    .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
+    .btn-modal-save { flex: 1; background: var(--mc-red); border: none; padding: 12px; color: #fff; font-weight: 800; cursor: pointer; }
+    .btn-modal-cancel { flex: 1; background: transparent; border: 1px solid #444; padding: 12px; color: #888; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <header class="admin-header">
+    <div class="admin-logo">MIDNIGHT<span style="color: var(--mc-red);">ADMIN</span> / CARTA</div>
+    <button onclick="window.location.href='index.html'" class="btn-logout">VOLVER</button>
+  </header>
+
+  <div class="admin-container">
+    <main>
+        <div class="section-header">
+            <h2 class="section-title">Gestión de Productos</h2>
+            <button onclick="openModal()" class="btn-create">+ Nuevo Item</button>
+        </div>
+
+        <div class="filters-toolbar">
+            <button class="filter-chip active" onclick="filterList('all', this)">Todos</button>
+            <button class="filter-chip" onclick="filterList('vasos', this)">Tragos</button>
+            <button class="filter-chip" onclick="filterList('packs', this)">Packs</button>
+            <button class="filter-chip" onclick="filterList('baja', this)">Baja Grad.</button>
+            <button class="filter-chip" onclick="filterList('sin-alcohol', this)">Sin Alcohol</button>
+        </div>
+
+        <div id="menu-list" class="menu-grid">
+            <div class="loading-state">Cargando carta...</div>
+        </div>
+    </main>
+  </div>
+
+  <div id="itemModal" class="modal-overlay">
+    <div class="modal-box">
+        <h3 style="color:#fff; margin-top:0; font-family:'Outfit'; text-transform:uppercase;">Editar Item</h3>
+        <input type="hidden" id="editId">
+        
+        <label style="color:#666; font-size:10px; text-transform:uppercase;">Nombre</label>
+        <input type="text" id="editName" class="modal-input" placeholder="Ej: Fernet Branca">
+        
+        <label style="color:#666; font-size:10px; text-transform:uppercase;">Descripción</label>
+        <input type="text" id="editDesc" class="modal-input" placeholder="Ej: + Coca Cola">
+
+        <div style="display:flex; gap:10px;">
+            <div style="flex:1">
+                <label style="color:#666; font-size:10px; text-transform:uppercase;">Precio ($)</label>
+                <input type="number" id="editPrice" class="modal-input" placeholder="0">
+            </div>
+            <div style="flex:1">
+                <label style="color:#666; font-size:10px; text-transform:uppercase;">Categoría</label>
+                <select id="editCat" class="modal-select">
+                    <option value="vasos">Tragos (Vasos)</option>
+                    <option value="packs">Packs</option>
+                    <option value="baja">Baja Graduación</option>
+                    <option value="sin-alcohol">Sin Alcohol</option>
+                </select>
+            </div>
+        </div>
+        
+        <label style="color:#666; font-size:10px; text-transform:uppercase;">Subcategoría (Título Agrupador)</label>
+        <input type="text" id="editSub" class="modal-input" placeholder="Ej: Vodka, Gin, Whisky...">
+
+        <div class="modal-btns">
+            <button onclick="closeModal()" class="btn-modal-cancel">CANCELAR</button>
+            <button onclick="saveItem()" class="btn-modal-save">GUARDAR</button>
+        </div>
+        <button onclick="deleteItem()" id="btnDelete" style="width:100%; background:none; border:none; color:#444; font-size:10px; margin-top:15px; cursor:pointer; text-decoration:underline;">ELIMINAR ITEM</button>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let allItems = [];
+    let currentCat = 'all';
+
+    window.addEventListener('load', loadItems);
+
+    async function loadItems() {
+        const { data, error } = await client.from('menu_items').select('*').order('id', { ascending: true });
+        if(error) { alert("Error cargando"); return; }
+        allItems = data;
+        renderItems();
+    }
+
+    function renderItems() {
+        const container = document.getElementById('menu-list');
+        const filtered = currentCat === 'all' ? allItems : allItems.filter(i => i.category === currentCat);
+        
+        if(filtered.length === 0) { container.innerHTML = '<div class="empty-state">No hay items.</div>'; return; }
+
+        let html = '';
+        // Numeración dinámica visual en la lista
+        filtered.forEach((item, index) => {
+            const isActive = item.is_active;
+            const opacity = isActive ? '1' : '0.4';
+            
+            html += `
+            <div class="menu-item-card" style="opacity: ${opacity}">
+                <div class="item-left">
+                    <div class="item-index">${index + 1}</div>
+                    <div class="item-info">
+                        <h4>
+                            <span class="item-cat-badge">${item.subcategory || item.category}</span>
+                            ${item.name} ${item.is_pick ? '⭐' : ''}
+                        </h4>
+                        <p>${item.description || 'Sin descripción'}</p>
+                    </div>
+                </div>
+                <div class="item-actions">
+                    <label class="switch" title="Stock">
+                        <input type="checkbox" ${isActive ? 'checked' : ''} onchange="toggleStock(${item.id}, this.checked)">
+                        <span class="slider"></span>
+                    </label>
+                    <input type="number" class="price-input" value="${item.price}" onchange="updatePrice(${item.id}, this.value)">
+                    <button class="btn-edit" onclick="openModal(${item.id})">✏️</button>
+                </div>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    function filterList(cat, btn) {
+        currentCat = cat;
+        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+        renderItems();
+    }
+
+    // --- ACCIONES RÁPIDAS ---
+    async function toggleStock(id, status) {
+        await client.from('menu_items').update({ is_active: status }).eq('id', id);
+        // Actualizamos localmente para no recargar todo
+        const item = allItems.find(i => i.id === id); if(item) item.is_active = status;
+        renderItems();
+    }
+    async function updatePrice(id, newPrice) {
+        await client.from('menu_items').update({ price: newPrice }).eq('id', id);
+    }
+
+    // --- MODAL ---
+    const modal = document.getElementById('itemModal');
+    
+    function openModal(id = null) {
+        modal.style.display = 'flex';
+        if(id) {
+            const item = allItems.find(i => i.id === id);
+            document.getElementById('editId').value = item.id;
+            document.getElementById('editName').value = item.name;
+            document.getElementById('editDesc').value = item.description || '';
+            document.getElementById('editPrice').value = item.price;
+            document.getElementById('editCat').value = item.category;
+            document.getElementById('editSub').value = item.subcategory || '';
+            document.getElementById('btnDelete').style.display = 'block';
+        } else {
+            // Crear nuevo
+            document.getElementById('editId').value = '';
+            document.getElementById('editName').value = '';
+            document.getElementById('editDesc').value = '';
+            document.getElementById('editPrice').value = '';
+            document.getElementById('editSub').value = '';
+            document.getElementById('btnDelete').style.display = 'none';
+        }
+    }
+    
+    function closeModal() { modal.style.display = 'none'; }
+
+    async function saveItem() {
+        const id = document.getElementById('editId').value;
+        const data = {
+            name: document.getElementById('editName').value,
+            description: document.getElementById('editDesc').value,
+            price: parseInt(document.getElementById('editPrice').value),
+            category: document.getElementById('editCat').value,
+            subcategory: document.getElementById('editSub').value,
+        };
+
+        if(id) {
+            await client.from('menu_items').update(data).eq('id', id);
+        } else {
+            await client.from('menu_items').insert(data);
+        }
+        closeModal();
+        loadItems(); // Recargar lista completa
+    }
+
+    async function deleteItem() {
+        const id = document.getElementById('editId').value;
+        if(confirm("¿Eliminar este item permanentemente?")) {
+            await client.from('menu_items').delete().eq('id', id);
+            closeModal();
+            loadItems();
+        }
+    }
+  </script>
+</body>
+</html>
