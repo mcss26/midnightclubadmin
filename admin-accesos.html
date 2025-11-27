@@ -62,28 +62,41 @@
     function logout() { window.location.href = "index.html"; }
 
     // --- 1. CONFIGURACIÓN DE TICKETS ---
+    // --- 1. CONFIGURACIÓN DE TICKETS (CORREGIDO) ---
     async function loadConfig() {
       const container = document.getElementById('config-list');
-      const { data: configs, error } = await client.from('site_config').select('*').order('id');
-      if (error) { container.innerHTML = '<div class="error-state" style="font-size:12px;">Error cargando configuración.</div>'; return; }
+      
+      // CAMBIO AQUÍ: Ordenar por 'key' en lugar de 'id'
+      const { data: configs, error } = await client
+        .from('site_config')
+        .select('*')
+        .order('key', { ascending: true });
+
+      if (error) { 
+        console.error("Error Supabase:", error); // Para ver detalles en consola si falla
+        container.innerHTML = '<div class="error-state" style="font-size:12px;">Error cargando configuración.</div>'; 
+        return; 
+      }
       
       let html = '';
-      configs.forEach(conf => {
-        // Filtrar solo las keys de accesos y members
-        if(conf.key.startsWith('access_') || conf.key.startsWith('mem_')) {
-           html += `
-            <div class="config-item">
-              <div class="config-header">
-                <span class="config-label">${conf.label}</span>
-                <label class="switch">
-                  <input type="checkbox" ${conf.is_active ? 'checked' : ''} onchange="toggleConfig('${conf.key}', this.checked)">
-                  <span class="slider"></span>
-                </label>
-              </div>
-              <input type="text" class="config-input" value="${conf.url || ''}" onchange="updateConfigUrl('${conf.key}', this.value)" placeholder="Pegar URL de Passline aquí...">
-            </div>`;
-        }
-      });
+      if (configs) {
+        configs.forEach(conf => {
+          // Filtrar solo las keys de accesos y members
+          if(conf.key.startsWith('access_') || conf.key.startsWith('mem_')) {
+             html += `
+              <div class="config-item">
+                <div class="config-header">
+                  <span class="config-label">${conf.label || conf.key}</span>
+                  <label class="switch">
+                    <input type="checkbox" ${conf.is_active ? 'checked' : ''} onchange="toggleConfig('${conf.key}', this.checked)">
+                    <span class="slider"></span>
+                  </label>
+                </div>
+                <input type="text" class="config-input" value="${conf.url || ''}" onchange="updateConfigUrl('${conf.key}', this.value)" placeholder="Pegar URL de Passline aquí...">
+              </div>`;
+          }
+        });
+      }
       container.innerHTML = html || '<div class="empty-state">No hay configuraciones disponibles.</div>';
     }
 
