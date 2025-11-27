@@ -10,38 +10,35 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <style>
-    /* Estilos extra para esta vista */
     .search-bar-container { margin-bottom: 20px; }
     .search-input-admin { width: 100%; padding: 12px 15px; background: #111; border: 1px solid #444; color: #fff; font-size: 14px; border-radius: 4px; outline: none; font-family: 'Inter'; }
     .insta-toolbar { background: var(--mc-card-bg); border: 1px solid var(--mc-border); padding: 15px; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; border-radius: 8px; }
     .insta-input { background: #000; border: 1px solid #444; color: #fff; padding: 8px; width: 60px; text-align: center; font-weight: 700; border-radius: 4px; }
     .btn-bulk { background: #fff; color: #000; border: none; padding: 8px 15px; font-weight: 800; cursor: pointer; font-size: 11px; border-radius: 4px; flex: 1; text-transform: uppercase; transition: opacity 0.2s; }
-    .btn-bulk:hover { opacity: 0.9; }
-    /* Botón Volver */
     .btn-back { text-decoration: none; color: #888; font-size: 12px; display: flex; align-items: center; gap: 5px; margin-bottom: 20px; font-weight: 600; }
-    .btn-back:hover { color: #fff; }
   </style>
 </head>
 <body>
 
   <header class="admin-header">
     <div class="admin-logo">MIDNIGHT<span style="color: var(--mc-red);">ADMIN</span> / SOCIOS</div>
-    <button onclick="logout()" class="btn-logout">CERRAR SESIÓN</button>
+    <div style="display:flex; gap:15px; align-items:center;">
+        <span id="roleBadge" style="font-size:10px; border:1px solid #333; padding:4px 8px; border-radius:4px; color:#888;"></span>
+        <button onclick="window.location.href='index.html'" class="btn-logout">VOLVER</button>
+    </div>
   </header>
 
   <div class="admin-container" style="grid-template-columns: 1fr;"> <main>
-      <a href="index.html" class="btn-back">← Volver al Dashboard</a>
-
       <div class="section-header">
         <h2 class="section-title">Gestión de Solicitudes</h2>
-        <button onclick="loadRequests(currentFilter)" class="btn-refresh" title="Actualizar lista">↻</button>
+        <button onclick="loadRequests(currentFilter)" class="btn-refresh">↻</button>
       </div>
 
       <div class="insta-toolbar">
-        <span style="font-size:11px; font-weight:700; color:#aaa; text-transform: uppercase;">Abrir Instagrams (Lote):</span>
+        <span style="font-size:11px; font-weight:700; color:#aaa; text-transform: uppercase;">Abrir Instagrams:</span>
         <input type="number" id="instaFrom" class="insta-input" placeholder="DE" min="1">
         <input type="number" id="instaTo" class="insta-input" placeholder="A" min="1">
-        <button onclick="openBulkInstagrams()" class="btn-bulk">Abrir Perfiles ↗</button>
+        <button onclick="openBulkInstagrams()" class="btn-bulk">Abrir ↗</button>
       </div>
 
       <div class="search-bar-container">
@@ -62,59 +59,57 @@
   </div>
 
   <script>
-    // === CONFIGURACIÓN (¡COMPLETAR!) ===
     const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
-    // 👇👇👇 PEGA TU CLAVE SUPABASE AQUÍ 👇👇👇
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258'; 
-
-    // 👇👇👇 PEGA TUS CLAVES EMAILJS AQUÍ 👇👇👇
     const EMAILJS_PUBLIC_KEY = "FaYbPCI_5oJSsC9g4";
     const EMAILJS_SERVICE_ID = "service_j7h80jk";
     const EMAILJS_TEMPLATE_APROBADO = "template_l425bfo"; 
 
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    (function(){ try { emailjs.init(EMAILJS_PUBLIC_KEY); } catch(e) { console.error("Error EmailJS:", e); } })();
+    (function(){ try { emailjs.init(EMAILJS_PUBLIC_KEY); } catch(e) {} })();
     
+    // --- SEGURIDAD RBAC ---
+    const role = localStorage.getItem('mc_admin_role') || 'invitado';
+    const user = localStorage.getItem('mc_admin_user') || 'Desconocido';
+
+    // QUIÉN PUEDE APROBAR/RECHAZAR: Superadmin, Admin y CXMR (Manager)
+    // El "operativo" (barra) NO está aquí.
+    const canApprove = ['superadmin', 'admin', 'manager'].includes(role);
+
     let currentFilter = 'pendiente';
-    let currentRequestsData = []; // Para el buscador y el bulk de IG
+    let currentRequestsData = [];
 
     window.addEventListener('load', () => {
-      setupFilters();
-      loadRequests(currentFilter);
-      setupSearch();
+        document.getElementById('roleBadge').innerText = user + ' | ' + role.toUpperCase();
+        setupFilters();
+        loadRequests(currentFilter);
+        setupSearch();
     });
 
-    function logout() { window.location.href = "index.html"; }
-
-    // --- 1. FILTROS ---
     function setupFilters() {
       const chips = document.querySelectorAll('.filter-chip');
       chips.forEach(chip => {
         chip.addEventListener('click', () => {
           chips.forEach(c => c.classList.remove('active')); chip.classList.add('active');
           currentFilter = chip.dataset.status;
-          document.getElementById('searchMembers').value = ''; // Limpiar buscador al filtrar
+          document.getElementById('searchMembers').value = ''; 
           loadRequests(currentFilter);
         });
       });
     }
 
-    // --- 2. CARGAR LISTA ---
     async function loadRequests(statusFilter) {
       const listContainer = document.getElementById('requests-list');
       listContainer.innerHTML = '<div class="loading-state">Actualizando datos...</div>';
-
+      
       let query = client.from('members').select('*').order('created_at', { ascending: false });
-      if (statusFilter && statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
-
+      if (statusFilter && statusFilter !== 'all') { query = query.eq('status', statusFilter); }
+      
       const { data: requests, error } = await query;
-
       if (error) { listContainer.innerHTML = `<div class="error-state">Error: ${error.message}</div>`; return; }
-      if (!requests || requests.length === 0) { listContainer.innerHTML = '<div class="empty-state">No hay solicitudes en esta categoría.</div>'; return; }
-
-      currentRequestsData = requests; // Guardar datos para uso local (buscador/IG)
+      if (!requests || requests.length === 0) { listContainer.innerHTML = '<div class="empty-state">No hay solicitudes.</div>'; return; }
+      
+      currentRequestsData = requests;
       renderList(currentRequestsData);
     }
 
@@ -124,19 +119,25 @@
 
       let html = '';
       data.forEach(req => {
-        let rightPanel = ''; let borderColor = '';
-        // Escapar datos para evitar errores de JS en los onlick
         const safeName = req.nombre ? req.nombre.replace(/'/g, "\\'") : 'Usuario';
         const safeEmail = req.email || '';
         const safeMemberID = req.member_id || '';
+        let rightPanel = ''; 
+        let borderColor = '';
 
         if (req.status === 'pendiente') {
             borderColor = 'var(--mc-red)';
-            rightPanel = `
-              <div class="req-actions">
-                <button class="btn-action btn-approve" onclick="procesar('${req.id}', 'activo', '${safeName}', '${safeEmail}', '${safeMemberID}')">APROBAR</button>
-                <button class="btn-action btn-reject" onclick="procesar('${req.id}', 'rechazado')">RECHAZAR</button>
-              </div>`;
+            if (canApprove) {
+                // TIENE PERMISO
+                rightPanel = `
+                  <div class="req-actions">
+                    <button class="btn-action btn-approve" onclick="procesar('${req.id}', 'activo', '${safeName}', '${safeEmail}', '${safeMemberID}')">APROBAR</button>
+                    <button class="btn-action btn-reject" onclick="procesar('${req.id}', 'rechazado')">RECHAZAR</button>
+                  </div>`;
+            } else {
+                // MODO SOLO LECTURA (Ej: Barra)
+                rightPanel = `<span style="color:#666; font-size:9px; font-weight:700; border:1px solid #333; padding:5px;">👁️ LECTURA</span>`;
+            }
         } else if (req.status === 'activo') {
             borderColor = 'var(--mc-accent-green)';
             rightPanel = `<span class="status-badge status-active">ACTIVO ✅</span>`;
@@ -149,76 +150,56 @@
           <div class="request-card" style="border-left: 4px solid ${borderColor}">
             <div class="req-info">
               <h3>${req.nombre} <span class="req-id-badge">${req.member_id || 'Sin ID'}</span></h3>
-              <div class="req-detail-row"><span class="req-detail"><span class="req-icon">🎂</span> ${req.nacimiento || '—'}</span><span class="req-detail"><span class="req-icon">📱</span> ${req.telefono}</span></div>
+              <div class="req-detail-row"><span class="req-detail">🎂 ${req.nacimiento || '—'}</span><span class="req-detail">📱 ${req.telefono}</span></div>
               <div class="req-detail-row">
-                <span class="req-detail"><span class="req-icon">📸</span> <a href="https://instagram.com/${req.instagram}" target="_blank" style="color:inherit; text-decoration:underline;">${req.instagram}</a></span>
-                <span class="req-detail"><span class="req-icon">📧</span> ${req.email}</span>
+                <span class="req-detail">📸 <a href="https://instagram.com/${req.instagram}" target="_blank" style="color:inherit; text-decoration:underline;">${req.instagram}</a></span>
               </div>
-              <div class="req-pass"><span class="pass-label">ACCESO INICIAL:</span> ${req.access_password || '—'}</div>
             </div>
             ${rightPanel}
           </div>`;
       });
       listContainer.innerHTML = html;
+      if (!canApprove) document.querySelector('.section-title').innerHTML = 'Solicitudes <span style="font-size:10px; border:1px solid #444; padding:2px 5px; color:#888;">LECTURA</span>';
     }
 
-    // --- 3. PROCESAR (APROBAR/RECHAZAR) ---
     async function procesar(id, nuevoEstado, nombre, email, memberId) {
+      if(!canApprove) return; // Doble check de seguridad
       document.body.style.cursor = 'wait';
       const { error } = await client.from('members').update({ status: nuevoEstado }).eq('id', id);
       document.body.style.cursor = 'default';
 
-      if(error) { 
-        alert("Error DB: " + error.message); 
-      } else { 
-        // Enviar mail si se aprueba
+      if(error) { alert("Error DB"); } else { 
+        // LOG AUDITORIA
+        client.from('admin_logs').insert({ admin_name: user, action: nuevoEstado === 'activo' ? 'APROBAR' : 'RECHAZAR', details: `${nombre} (${email})` }).then();
+
         if (nuevoEstado === 'activo' && email && email.includes('@')) {
-           const templateParams = { to_name: nombre, to_email: email, member_id: memberId || 'Pendiente', login_url: 'https://midnightclub.biz' };
-           emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_APROBADO, templateParams).catch(e => console.error("Mail error:", e));
+           const templateParams = { to_name: nombre, to_email: email, member_id: memberId, login_url: 'https://midnightclub.biz' };
+           emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_APROBADO, templateParams).catch(console.error);
         }
-        loadRequests(currentFilter); // Recargar lista
+        loadRequests(currentFilter);
       }
     }
 
-    // --- 4. BUSCADOR ---
     function setupSearch() {
       document.getElementById('searchMembers').addEventListener('input', (e) => {
         const term = e.target.value.toLowerCase();
-        if (term === '') {
-          renderList(currentRequestsData); // Mostrar lista completa del filtro actual
-        } else {
-          const filtered = currentRequestsData.filter(req => {
-            return (req.nombre && req.nombre.toLowerCase().includes(term)) ||
-                   (req.instagram && req.instagram.toLowerCase().includes(term)) ||
-                   (req.email && req.email.toLowerCase().includes(term)) ||
-                   (req.member_id && req.member_id.toLowerCase().includes(term));
-          });
+        if (term === '') { renderList(currentRequestsData); } else {
+          const filtered = currentRequestsData.filter(req => 
+            (req.nombre && req.nombre.toLowerCase().includes(term)) ||
+            (req.instagram && req.instagram.toLowerCase().includes(term)) ||
+            (req.member_id && req.member_id.toLowerCase().includes(term))
+          );
           renderList(filtered);
         }
       });
     }
 
-    // --- 5. INSTAGRAM BULK ---
     function openBulkInstagrams() {
       const from = parseInt(document.getElementById('instaFrom').value);
       const to = parseInt(document.getElementById('instaTo').value);
-      if (isNaN(from) || isNaN(to) || from < 1 || to < from) { alert("Rango inválido. Ej: De 1 a 5"); return; }
-      
-      // Usar los datos que se ven actualmente en pantalla (filtrados o buscados)
-      const listToUse = currentRequestsData;
-      
-      if (to > listToUse.length) { alert(`Solo hay ${listToUse.length} solicitudes en esta vista.`); return; }
-
-      // Ajustar índice (de 1-based a 0-based) y cortar
-      const slice = listToUse.slice(from - 1, to);
-      
-      let count = 0;
-      slice.forEach(req => {
-        if(req.instagram && req.instagram.length > 2) { 
-          window.open(`https://instagram.com/${req.instagram.replace('@','')}`, '_blank'); count++; 
-        }
-      });
-      if (count === 0) alert("Ninguno de los usuarios seleccionados tiene Instagram válido.");
+      if (isNaN(from) || isNaN(to) || from < 1 || to < from) return;
+      const slice = currentRequestsData.slice(from - 1, to);
+      slice.forEach(req => { if(req.instagram && req.instagram.length > 2) window.open(`https://instagram.com/${req.instagram.replace('@','')}`, '_blank'); });
     }
   </script>
 </body>

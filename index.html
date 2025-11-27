@@ -4,42 +4,21 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Midnight Admin — Dashboard</title>
-  
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="admin-styles.css" />
-  
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
-    /* Estilos específicos para el Dashboard Principal */
-    .dashboard-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-      gap: 20px;
-      margin-top: 30px;
-    }
-
-    .dash-card {
-      background: var(--mc-card-bg);
-      border: 1px solid var(--mc-border);
-      border-radius: 12px;
-      padding: 25px;
-      text-align: center;
-      transition: transform 0.2s, border-color 0.2s;
-      text-decoration: none; /* Porque serán enlaces */
-      display: block;
-    }
-    .dash-card:hover {
-      transform: translateY(-5px);
-      border-color: #fff;
-    }
-    
-    /* Colores específicos por tarjeta (Hover) */
+    /* Estilos Dashboard */
+    .dashboard-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-top: 30px; }
+    .dash-card { background: var(--mc-card-bg); border: 1px solid var(--mc-border); border-radius: 12px; padding: 25px; text-align: center; transition: transform 0.2s, border-color 0.2s; text-decoration: none; display: block; }
+    .dash-card:hover { transform: translateY(-5px); border-color: #fff; }
     .card-solicitudes:hover { border-color: var(--mc-red); }
     .card-accesos:hover { border-color: var(--mc-accent-green); }
-    .card-cumples:hover { border-color: #FFD700; } /* Dorado */
-    .card-carta:hover { border-color: #d600ff; } /* Violeta Neón */
+    .card-cumples:hover { border-color: #FFD700; }
+    .card-carta:hover { border-color: #d600ff; }
+    .card-logs:hover { border-color: #00eaff; }
 
     .dash-icon { font-size: 32px; margin-bottom: 15px; display: block; }
     .dash-title { color: #fff; font-family: 'Outfit', sans-serif; font-size: 16px; text-transform: uppercase; margin-bottom: 10px; }
@@ -50,143 +29,145 @@
     /* Login Overlay */
     #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     .login-box { width: 300px; text-align: center; background: #111; padding: 30px; border: 1px solid #333; border-radius: 8px; }
-    .login-input { width: 100%; padding: 12px; background: #000; border: 1px solid #333; color: #fff; text-align: center; margin: 20px 0; outline: none; font-family: monospace; }
+    .login-input { width: 100%; padding: 12px; background: #000; border: 1px solid #333; color: #fff; text-align: center; margin-bottom: 15px; outline: none; font-family: monospace; }
     .btn-login { background: var(--mc-red); color: #fff; border: none; padding: 12px; width: 100%; font-weight: 800; cursor: pointer; border-radius: 4px; }
+    .login-error { color: var(--mc-red); font-size: 11px; margin-bottom: 15px; display: none; }
   </style>
 </head>
 <body>
 
   <div id="login-overlay">
     <div class="login-box">
-      <h2 style="color:var(--mc-red); font-family:'Outfit'; margin:0;">MIDNIGHT ADMIN</h2>
-      <p style="color:#666; font-size:12px;">Acceso restringido</p>
+      <h2 style="color:var(--mc-red); font-family:'Outfit'; margin:0 0 20px 0;">MIDNIGHT ADMIN</h2>
+      <input type="text" id="userInput" class="login-input" placeholder="USUARIO" autocomplete="off">
       <input type="password" id="passInput" class="login-input" placeholder="CONTRASEÑA">
-      <button onclick="login()" class="btn-login">INGRESAR</button>
+      <div id="loginError" class="login-error">Credenciales inválidas</div>
+      <button id="btnLogin" class="btn-login">INGRESAR</button>
     </div>
   </div>
 
   <div id="main-content" style="display: none;">
-    
     <header class="admin-header">
       <div class="admin-logo">MIDNIGHT<span style="color: var(--mc-red);">ADMIN</span> / HOME</div>
-      <button onclick="logout()" class="btn-logout">CERRAR SESIÓN</button>
+      <div style="display:flex; align-items:center; gap:15px;">
+          <span id="userDisplay" style="color:#666; font-size:11px; font-weight:700; text-transform:uppercase;"></span>
+          <button onclick="logout()" class="btn-logout">SALIR</button>
+      </div>
     </header>
 
     <div class="admin-container" style="max-width: 900px;">
-      
       <div class="section-header" style="border: none;">
-        <h2 class="section-title" style="font-size: 28px;">Resumen General</h2>
+        <h2 class="section-title" style="font-size: 28px;">Panel de Control</h2>
       </div>
-      <p style="color: #888; margin-top: -15px;">Selecciona una sección para gestionar.</p>
 
       <div class="dashboard-grid">
-        
         <a href="admin-solicitudes.html" class="dash-card card-solicitudes">
-          <span class="dash-icon">👥</span>
-          <h3 class="dash-title">Solicitudes</h3>
-          <div id="count-pending" class="dash-count pending">--</div>
-          <div class="dash-sub">Pendientes de aprobación</div>
+          <span class="dash-icon">👥</span><h3 class="dash-title">Solicitudes</h3>
+          <div id="count-pending" class="dash-count pending">--</div><div class="dash-sub">Pendientes</div>
         </a>
-
         <a href="admin-accesos.html" class="dash-card card-accesos">
-          <span class="dash-icon">🎟️</span>
-          <h3 class="dash-title">Accesos & Config</h3>
-          <div id="count-active-tickets" class="dash-count">--</div>
-          <div class="dash-sub">Tickets activos actualmente</div>
+          <span class="dash-icon">🎟️</span><h3 class="dash-title">Accesos</h3>
+          <div id="count-active-tickets" class="dash-count">--</div><div class="dash-sub">Activos</div>
         </a>
-
-        <a href="admin-cumples.html" class="dash-card card-cumples">
-          <span class="dash-icon">🎂</span>
-          <h3 class="dash-title">Cumpleaños</h3>
-          <div id="count-birthdays" class="dash-count">--</div>
-          <div class="dash-sub">Esta semana (Lun-Dom)</div>
-        </a>
-
         <a href="admin-carta.html" class="dash-card card-carta">
-          <span class="dash-icon">🍹</span>
-          <h3 class="dash-title">Carta Digital</h3>
-          <div id="count-menu" class="dash-count">--</div>
-          <div class="dash-sub">Productos activos</div>
+          <span class="dash-icon">🍹</span><h3 class="dash-title">Carta</h3>
+          <div id="count-menu" class="dash-count">--</div><div class="dash-sub">Productos</div>
+        </a>
+        <a href="admin-cumples.html" class="dash-card card-cumples">
+          <span class="dash-icon">🎂</span><h3 class="dash-title">Cumpleaños</h3>
+          <div id="count-birthdays" class="dash-count">--</div><div class="dash-sub">Semana</div>
         </a>
 
+        <a href="admin-logs.html" class="dash-card card-logs" id="cardLogs" style="display:none;">
+          <span class="dash-icon">🛡️</span><h3 class="dash-title">Logs & Seguridad</h3>
+          <div class="dash-count" style="font-size:14px; color:#00eaff; line-height:2.5;">AUDITORÍA</div>
+          <div class="dash-sub">Solo SuperAdmin</div>
+        </a>
       </div>
-
     </div>
   </div>
-
 
   <script>
     const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // --- 1. LOGIN ---
-    function login() {
-      const pass = document.getElementById('passInput').value;
-      if (pass === 'midnight2026') { 
+    // INICIO
+    document.addEventListener('DOMContentLoaded', () => {
+        const currentUser = localStorage.getItem('mc_admin_user');
+        const currentRole = localStorage.getItem('mc_admin_role');
+        
+        if (currentUser && currentRole) {
+            initSession(currentUser, currentRole);
+        }
+    });
+
+    // LOGIN
+    async function doLogin() {
+        const user = document.getElementById('userInput').value.trim(); // Nota: Sensible a mayúsculas/espacios exactos
+        const pass = document.getElementById('passInput').value.trim();
+        const btn = document.getElementById('btnLogin');
+        const err = document.getElementById('loginError');
+
+        btn.innerText = "..."; err.style.display = 'none';
+
+        const { data, error } = await client.from('admins')
+            .select('*')
+            .eq('username', user)
+            .eq('password', pass)
+            .single();
+
+        if (data) {
+            // Guardar sesión y rol
+            localStorage.setItem('mc_admin_user', data.username);
+            localStorage.setItem('mc_admin_role', data.role);
+            
+            // LOGUEAR ENTRADA
+            await client.from('admin_logs').insert({ 
+                admin_name: data.username, action: 'LOGIN', details: `Rol: ${data.role}` 
+            });
+
+            initSession(data.username, data.role);
+        } else {
+            btn.innerText = "INGRESAR";
+            err.style.display = 'block';
+        }
+    }
+
+    document.getElementById('btnLogin').addEventListener('click', doLogin);
+    document.getElementById('passInput').addEventListener('keydown', (e) => { if(e.key==='Enter') doLogin(); });
+
+    function initSession(user, role) {
         document.getElementById('login-overlay').style.display = 'none';
         document.getElementById('main-content').style.display = 'block';
+        document.getElementById('userDisplay').innerText = `${user} [${role.toUpperCase()}]`;
+
+        // 1. Logs: Solo Superadmin
+        if (role === 'superadmin') {
+            document.getElementById('cardLogs').style.display = 'block';
+        } else {
+            document.getElementById('cardLogs').style.display = 'none';
+        }
+
         loadDashboardCounts();
-      } else {
-        alert('Contraseña incorrecta.');
-        document.getElementById('passInput').value = '';
-        document.getElementById('passInput').focus();
-      }
     }
-    document.getElementById('passInput').addEventListener('keydown', (e) => { if(e.key === 'Enter') login(); });
-    function logout() { window.location.reload(); }
 
+    function logout() {
+        localStorage.clear();
+        window.location.reload();
+    }
 
-    // --- 2. CARGAR CONTADORES ---
+    // CONTADORES
     async function loadDashboardCounts() {
-      // A. Solicitudes Pendientes
-      const { count: pendingCount } = await client
-        .from('members')
-        .select('id', { count: 'exact', head: true }) 
-        .eq('status', 'pendiente');
-      document.getElementById('count-pending').textContent = pendingCount || '0';
-
-      // B. Tickets Activos
-      const { count: ticketCount } = await client
-        .from('site_config')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_active', true)
-        .like('key', 'access_%'); // Contamos access_0000 y access_plus
-      document.getElementById('count-active-tickets').textContent = ticketCount || '0';
-
-      // C. Carta (Items Activos) - NUEVO
-      const { count: menuCount } = await client
-        .from('menu_items')
-        .select('id', { count: 'exact', head: true })
-        .eq('is_active', true);
-      document.getElementById('count-menu').textContent = menuCount || '0';
-
-      // D. Cumpleaños Semana
-      const { data: members } = await client
-        .from('members')
-        .select('nacimiento')
-        .eq('status', 'activo');
-      
-      if (members) {
-        const today = new Date();
-        const currentDay = today.getDay(); const dayAdjusted = currentDay === 0 ? 7 : currentDay;
-        const monday = new Date(today); monday.setDate(today.getDate() - (dayAdjusted - 1)); monday.setHours(0,0,0,0);
-        const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); sunday.setHours(23,59,59,999);
-
-        let bdayCount = 0;
-        members.forEach(m => {
-          if (!m.nacimiento || m.nacimiento.length < 5) return;
-          let bMonth, bDay;
-          if (m.nacimiento.includes('-')) { const p = m.nacimiento.split('-'); bMonth = parseInt(p[1],10)-1; bDay = parseInt(p[2],10); }
-          else if (m.nacimiento.includes('/')) { const p = m.nacimiento.split('/'); bMonth = parseInt(p[1],10)-1; bDay = parseInt(p[0],10); }
-          else return;
-          const bdayThisYear = new Date(today.getFullYear(), bMonth, bDay);
-          if (bdayThisYear >= monday && bdayThisYear <= sunday) bdayCount++;
-        });
-        document.getElementById('count-birthdays').textContent = bdayCount;
-      } else {
-        document.getElementById('count-birthdays').textContent = '0';
-      }
+       const { count: pendingCount } = await client.from('members').select('*', { count: 'exact', head: true }).eq('status', 'pendiente');
+       document.getElementById('count-pending').textContent = pendingCount || '0';
+       const { count: ticketCount } = await client.from('site_config').select('*', { count: 'exact', head: true }).eq('is_active', true).like('key', 'access_%');
+       document.getElementById('count-active-tickets').textContent = ticketCount || '0';
+       const { count: menuCount } = await client.from('menu_items').select('*', { count: 'exact', head: true }).eq('is_active', true);
+       document.getElementById('count-menu').textContent = menuCount || '0';
+       
+       // Cumples (placeholder visual para no cargar lógica pesada en dash)
+       document.getElementById('count-birthdays').textContent = '-'; 
     }
   </script>
 </body>
