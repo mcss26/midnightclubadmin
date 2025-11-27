@@ -35,10 +35,11 @@
       border-color: #fff;
     }
     
-    /* Colores específicos por tarjeta */
+    /* Colores específicos por tarjeta (Hover) */
     .card-solicitudes:hover { border-color: var(--mc-red); }
     .card-accesos:hover { border-color: var(--mc-accent-green); }
     .card-cumples:hover { border-color: #FFD700; } /* Dorado */
+    .card-carta:hover { border-color: #d600ff; } /* Violeta Neón */
 
     .dash-icon { font-size: 32px; margin-bottom: 15px; display: block; }
     .dash-title { color: #fff; font-family: 'Outfit', sans-serif; font-size: 16px; text-transform: uppercase; margin-bottom: 10px; }
@@ -46,7 +47,7 @@
     .dash-count.pending { color: var(--mc-red); }
     .dash-sub { color: #888; font-size: 11px; margin-top: 5px; }
 
-    /* Login Overlay (Mismo estilo) */
+    /* Login Overlay */
     #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     .login-box { width: 300px; text-align: center; background: #111; padding: 30px; border: 1px solid #333; border-radius: 8px; }
     .login-input { width: 100%; padding: 12px; background: #000; border: 1px solid #333; color: #fff; text-align: center; margin: 20px 0; outline: none; font-family: monospace; }
@@ -101,6 +102,13 @@
           <div class="dash-sub">Esta semana (Lun-Dom)</div>
         </a>
 
+        <a href="admin-carta.html" class="dash-card card-carta">
+          <span class="dash-icon">🍹</span>
+          <h3 class="dash-title">Carta Digital</h3>
+          <div id="count-menu" class="dash-count">--</div>
+          <div class="dash-sub">Productos activos</div>
+        </a>
+
       </div>
 
     </div>
@@ -108,20 +116,16 @@
 
 
   <script>
-    // === CONFIGURACIÓN ===
     const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
-    // 👇👇👇 PEGA TU CLAVE SUPABASE AQUÍ 👇👇👇
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
-
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     // --- 1. LOGIN ---
     function login() {
       const pass = document.getElementById('passInput').value;
-      if (pass === 'midnight2026') { // CLAVE TEMPORAL
+      if (pass === 'midnight2026') { 
         document.getElementById('login-overlay').style.display = 'none';
         document.getElementById('main-content').style.display = 'block';
-        // Cargar contadores al entrar
         loadDashboardCounts();
       } else {
         alert('Contraseña incorrecta.');
@@ -130,30 +134,34 @@
       }
     }
     document.getElementById('passInput').addEventListener('keydown', (e) => { if(e.key === 'Enter') login(); });
-    function logout() { window.location.reload(); } // Recargar pide login de nuevo
+    function logout() { window.location.reload(); }
 
 
-    // --- 2. CARGAR CONTADORES DEL DASHBOARD ---
+    // --- 2. CARGAR CONTADORES ---
     async function loadDashboardCounts() {
-      // A. Contar Solicitudes Pendientes
+      // A. Solicitudes Pendientes
       const { count: pendingCount } = await client
         .from('members')
-        .select('id', { count: 'exact', head: true }) // 'head: true' solo cuenta, no trae datos. Es más rápido.
+        .select('id', { count: 'exact', head: true }) 
         .eq('status', 'pendiente');
-      
       document.getElementById('count-pending').textContent = pendingCount || '0';
 
-      // B. Contar Tickets Activos (site_config)
+      // B. Tickets Activos
       const { count: ticketCount } = await client
         .from('site_config')
         .select('id', { count: 'exact', head: true })
         .eq('is_active', true)
-        .like('key', 'access_%'); // Solo cuenta keys que empiecen con 'access_'
-      
+        .like('key', 'access_%'); // Contamos access_0000 y access_plus
       document.getElementById('count-active-tickets').textContent = ticketCount || '0';
 
-      // C. Contar Cumpleaños de la Semana (Requiere cálculo JS)
-      // Traemos solo fecha de nacimiento de miembros activos
+      // C. Carta (Items Activos) - NUEVO
+      const { count: menuCount } = await client
+        .from('menu_items')
+        .select('id', { count: 'exact', head: true })
+        .eq('is_active', true);
+      document.getElementById('count-menu').textContent = menuCount || '0';
+
+      // D. Cumpleaños Semana
       const { data: members } = await client
         .from('members')
         .select('nacimiento')
@@ -181,7 +189,5 @@
       }
     }
   </script>
-
 </body>
 </html>
-
