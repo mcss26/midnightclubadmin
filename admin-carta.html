@@ -16,11 +16,17 @@
     .item-info h4 { margin: 0; color: #fff; font-size: 14px; text-transform: uppercase; }
     .item-info p { margin: 4px 0 0; color: #888; font-size: 11px; }
     .item-cat-badge { font-size: 9px; padding: 2px 6px; border-radius: 4px; background: #222; color: #aaa; text-transform: uppercase; margin-right: 5px; }
-    .item-actions { display: flex; align-items: center; gap: 15px; }
-    .price-input { background: #000; border: 1px solid #333; color: var(--mc-accent-green); padding: 8px; width: 80px; text-align: right; font-family: monospace; font-weight: 700; border-radius: 4px; outline: none; }
-    .price-input:disabled { opacity: 0.5; cursor: not-allowed; border-color: transparent; }
-    .btn-edit { background: #333; color: #fff; border: none; padding: 8px; border-radius: 4px; cursor: pointer; }
     
+    .item-actions { display: flex; align-items: center; gap: 15px; }
+    
+    /* Input Precio lista */
+    .price-input { background: #000; border: 1px solid #333; color: #fff; padding: 8px; width: 80px; text-align: right; font-family: monospace; font-weight: 700; border-radius: 4px; outline: none; }
+    .price-input:disabled { opacity: 0.5; cursor: not-allowed; border-color: transparent; }
+    
+    /* Visualizador Precio Cash (Pequeño) */
+    .cash-preview { font-size: 10px; color: var(--mc-accent-green); font-family: monospace; text-align: right; margin-top: 4px; display: block; font-weight: 700; }
+
+    .btn-edit { background: #333; color: #fff; border: none; padding: 8px; border-radius: 4px; cursor: pointer; }
     .btn-create { background: var(--mc-red); color: #fff; border: none; padding: 10px 20px; font-weight: 800; border-radius: 4px; cursor: pointer; text-transform: uppercase; }
     .btn-analytics { background: #111; border: 1px solid #333; color: #00eaff; padding: 10px 15px; font-weight: 700; border-radius: 4px; cursor: pointer; text-transform: uppercase; font-size: 11px; display: flex; align-items: center; gap: 5px; }
     .btn-analytics:hover { border-color: #00eaff; background: rgba(0, 234, 255, 0.1); }
@@ -33,7 +39,7 @@
     .btn-modal-save { flex: 1; background: var(--mc-red); border: none; padding: 12px; color: #fff; font-weight: 800; cursor: pointer; }
     .btn-modal-cancel { flex: 1; background: transparent; border: 1px solid #444; padding: 12px; color: #888; cursor: pointer; }
 
-    /* Estilos Analytics */
+    /* Analytics styles (Keep existing) */
     .stats-row { display: flex; gap: 15px; margin-bottom: 20px; }
     .stat-col { flex: 1; background: #000; padding: 15px; border-radius: 8px; border: 1px solid #222; }
     .stat-title { color: #888; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px; }
@@ -81,7 +87,6 @@
       <div class="modal-box" style="max-width: 600px;">
           <h3 style="color:#fff; margin-top:0; font-family:'Outfit'; text-transform:uppercase;">Insights de Búsqueda</h3>
           <p style="color:#666; font-size:11px; margin-bottom:20px;">Análisis de las últimas 500 búsquedas en la Carta Digital.</p>
-          
           <div class="stats-row">
               <div class="stat-col">
                   <div class="stat-title">Top Buscados (General)</div>
@@ -92,7 +97,6 @@
                   <ul id="listMissed" class="stat-list"><li style="text-align:center;">Cargando...</li></ul>
               </div>
           </div>
-          
           <button onclick="document.getElementById('analyticsModal').style.display='none'" class="btn-modal-cancel" style="width:100%;">CERRAR</button>
       </div>
   </div>
@@ -101,14 +105,18 @@
     <div class="modal-box">
         <h3 style="color:#fff; margin-top:0; font-family:'Outfit'; text-transform:uppercase;">Editar Item</h3>
         <input type="hidden" id="editId">
+        
         <label style="color:#666; font-size:10px; text-transform:uppercase;">Nombre</label>
         <input type="text" id="editName" class="modal-input" placeholder="Ej: Fernet Branca">
+        
         <label style="color:#666; font-size:10px; text-transform:uppercase;">Descripción</label>
         <input type="text" id="editDesc" class="modal-input" placeholder="Ej: + Coca Cola">
+
         <div style="display:flex; gap:10px;">
             <div style="flex:1">
-                <label style="color:#666; font-size:10px; text-transform:uppercase;">Precio ($)</label>
-                <input type="number" id="editPrice" class="modal-input" placeholder="0">
+                <label style="color:#666; font-size:10px; text-transform:uppercase;">Precio Lista (Tarjeta)</label>
+                <input type="number" id="editPrice" class="modal-input" placeholder="0" oninput="calcCashPreview()">
+                <div id="modalCashPreview" style="color:var(--mc-accent-green); font-size:11px; font-weight:700; text-align:right; margin-top:-10px; margin-bottom:15px;">Efectivo: $0</div>
             </div>
             <div style="flex:1">
                 <label style="color:#666; font-size:10px; text-transform:uppercase;">Categoría</label>
@@ -120,8 +128,10 @@
                 </select>
             </div>
         </div>
+        
         <label style="color:#666; font-size:10px; text-transform:uppercase;">Subcategoría</label>
         <input type="text" id="editSub" class="modal-input" placeholder="Ej: Vodka, Gin...">
+
         <div class="modal-btns">
             <button onclick="closeModal()" class="btn-modal-cancel">CANCELAR</button>
             <button onclick="saveItem()" class="btn-modal-save">GUARDAR</button>
@@ -168,6 +178,9 @@
             const pointerStyle = canEdit ? '' : 'pointer-events:none; opacity:0.5;';
             const editBtnDisplay = canEdit ? '' : 'display:none;';
 
+            // Calcular Efectivo (-25% redondeado a 100)
+            const cashPrice = Math.round((item.price * 0.75) / 100) * 100;
+
             html += `
             <div class="menu-item-card" style="opacity: ${opacity}">
                 <div class="item-left">
@@ -182,7 +195,12 @@
                         <input type="checkbox" ${isActive ? 'checked' : ''} ${disabledAttr} onchange="toggleStock(${item.id}, this.checked)">
                         <span class="slider"></span>
                     </label>
-                    <input type="number" class="price-input" value="${item.price}" ${disabledAttr} onchange="updatePrice(${item.id}, this.value)">
+                    
+                    <div style="display:flex; flex-direction:column; align-items:flex-end;">
+                        <input type="number" class="price-input" value="${item.price}" ${disabledAttr} onchange="updatePrice(${item.id}, this.value)">
+                        <span class="cash-preview">Efe: $${cashPrice}</span>
+                    </div>
+
                     <button class="btn-edit" onclick="openModal(${item.id})" style="${editBtnDisplay}">✏️</button>
                 </div>
             </div>`;
@@ -205,48 +223,28 @@
     async function updatePrice(id, newPrice) {
         await client.from('menu_items').update({ price: newPrice }).eq('id', id);
         client.from('admin_logs').insert({ admin_name: user, action: 'PRECIO', details: `Item ID ${id} -> $${newPrice}` }).then();
+        // Recargar para actualizar el cálculo de efectivo visualmente
+        setTimeout(loadItems, 500); 
     }
 
-    // --- ANALYTICS ---
+    // --- ANALYTICS (Igual que antes) ---
     async function openAnalytics() {
         document.getElementById('analyticsModal').style.display = 'flex';
-        
-        // 1. Obtener datos crudos
-        const { data, error } = await client.from('analytics_searches')
-            .select('term, results_count')
-            .order('created_at', {ascending: false})
-            .limit(500);
-
+        const { data } = await client.from('analytics_searches').select('term, results_count').order('created_at', {ascending: false}).limit(500);
         if(!data) return;
-
-        // 2. Procesar (Agrupar) en JS
-        let counts = {};
-        let missed = {};
-
+        let counts = {}; let missed = {};
         data.forEach(row => {
             const term = row.term.toLowerCase();
-            // Contar General
             counts[term] = (counts[term] || 0) + 1;
-            // Contar Missed (Si results_count == 0)
-            if(row.results_count === 0) {
-                missed[term] = (missed[term] || 0) + 1;
-            }
+            if(row.results_count === 0) missed[term] = (missed[term] || 0) + 1;
         });
-
-        // 3. Ordenar y Renderizar
         renderStatsList('listTop', counts, 10);
         renderStatsList('listMissed', missed, 10, true);
     }
-
     function renderStatsList(elemId, dataObj, limit, isRed = false) {
         const sorted = Object.entries(dataObj).sort((a,b) => b[1] - a[1]).slice(0, limit);
         const ul = document.getElementById(elemId);
-        
-        if(sorted.length === 0) {
-            ul.innerHTML = '<li style="color:#666; text-align:center; padding:10px;">Sin datos aún</li>';
-            return;
-        }
-
+        if(sorted.length === 0) { ul.innerHTML = '<li style="color:#666; text-align:center; padding:10px;">Sin datos aún</li>'; return; }
         let html = '';
         sorted.forEach(([term, count]) => {
             const countClass = isRed ? 'stat-zero' : 'stat-count';
@@ -268,6 +266,7 @@
             document.getElementById('editCat').value = item.category;
             document.getElementById('editSub').value = item.subcategory || '';
             document.getElementById('btnDelete').style.display = 'block';
+            calcCashPreview(); // Actualizar preview
         } else {
             document.getElementById('editId').value = '';
             document.getElementById('editName').value = '';
@@ -275,9 +274,17 @@
             document.getElementById('editPrice').value = '';
             document.getElementById('editSub').value = '';
             document.getElementById('btnDelete').style.display = 'none';
+            document.getElementById('modalCashPreview').innerText = 'Efectivo: $0';
         }
     }
     function closeModal() { modal.style.display = 'none'; }
+
+    // Calc en tiempo real dentro del modal
+    function calcCashPreview() {
+        const val = document.getElementById('editPrice').value;
+        const cash = Math.round((val * 0.75) / 100) * 100;
+        document.getElementById('modalCashPreview').innerText = `Efectivo: $${cash}`;
+    }
 
     async function saveItem() {
         const id = document.getElementById('editId').value;
