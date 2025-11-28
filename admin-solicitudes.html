@@ -72,8 +72,7 @@
     const role = localStorage.getItem('mc_admin_role') || 'invitado';
     const user = localStorage.getItem('mc_admin_user') || 'Desconocido';
 
-    // QUIÉN PUEDE APROBAR/RECHAZAR: Superadmin, Admin y CXMR (Manager)
-    // El "operativo" (barra) NO está aquí.
+    // QUIÉN PUEDE APROBAR: Superadmin, Admin y Manager (CXMR)
     const canApprove = ['superadmin', 'admin', 'manager'].includes(role);
 
     let currentFilter = 'pendiente';
@@ -132,10 +131,10 @@
                 rightPanel = `
                   <div class="req-actions">
                     <button class="btn-action btn-approve" onclick="procesar('${req.id}', 'activo', '${safeName}', '${safeEmail}', '${safeMemberID}')">APROBAR</button>
-                    <button class="btn-action btn-reject" onclick="procesar('${req.id}', 'rechazado')">RECHAZAR</button>
+                    <button class="btn-action btn-reject" onclick="procesar('${req.id}', 'rechazado', '${safeName}', '${safeEmail}')">RECHAZAR</button>
                   </div>`;
             } else {
-                // MODO SOLO LECTURA (Ej: Barra)
+                // SOLO LECTURA
                 rightPanel = `<span style="color:#666; font-size:9px; font-weight:700; border:1px solid #333; padding:5px;">👁️ LECTURA</span>`;
             }
         } else if (req.status === 'activo') {
@@ -153,7 +152,9 @@
               <div class="req-detail-row"><span class="req-detail">🎂 ${req.nacimiento || '—'}</span><span class="req-detail">📱 ${req.telefono}</span></div>
               <div class="req-detail-row">
                 <span class="req-detail">📸 <a href="https://instagram.com/${req.instagram}" target="_blank" style="color:inherit; text-decoration:underline;">${req.instagram}</a></span>
+                <span class="req-detail">📧 ${req.email}</span>
               </div>
+              <div class="req-pass"><span class="pass-label">ACCESO INICIAL:</span> ${req.access_password || '—'}</div>
             </div>
             ${rightPanel}
           </div>`;
@@ -162,20 +163,57 @@
       if (!canApprove) document.querySelector('.section-title').innerHTML = 'Solicitudes <span style="font-size:10px; border:1px solid #444; padding:2px 5px; color:#888;">LECTURA</span>';
     }
 
-    async function procesar(id, nuevoEstado, nombre, email, memberId) {
-      if(!canApprove) return; // Doble check de seguridad
+    // --- FUNCIÓN PRINCIPAL CORREGIDA ---
+    async function procesar(id, nuevoEstado, nombre, email, currentMemberId) {
+      if(!canApprove) return;
+      
+      let updates = { status: nuevoEstado };
+      let finalMemberId = currentMemberId;
+      let finalPassword = '---';
+
+      if (nuevoEstado === 'activo') {
+          // Generar ID si falta
+          if (!finalMemberId || finalMemberId === 'Sin ID' || finalMemberId.length < 3) {
+              const randomNum = Math.floor(1000 + Math.random() * 9000); 
+              finalMemberId = 'MC-' + randomNum;
+              updates.member_id = finalMemberId;
+          }
+          // Generar Password SIEMPRE al aprobar
+          finalPassword = Math.random().toString(36).slice(-6).toUpperCase();
+          updates.access_password = finalPassword; // Para Supabase (columna access_password)
+      }
+
       document.body.style.cursor = 'wait';
-      const { error } = await client.from('members').update({ status: nuevoEstado }).eq('id', id);
+      
+      // 1. Guardar en Base de Datos
+      const { error } = await client.from('members').update(updates).eq('id', id);
       document.body.style.cursor = 'default';
 
-      if(error) { alert("Error DB"); } else { 
-        // LOG AUDITORIA
-        client.from('admin_logs').insert({ admin_name: user, action: nuevoEstado === 'activo' ? 'APROBAR' : 'RECHAZAR', details: `${nombre} (${email})` }).then();
+      if(error) { 
+          alert("Error actualizando DB: " + error.message); 
+      } else { 
+        // 2. Log de Auditoría
+        client.from('admin_logs').insert({ 
+            admin_name: user, 
+            action: nuevoEstado === 'activo' ? 'APROBAR' : 'RECHAZAR', 
+            details: `${nombre} -> ${finalMemberId || 'Rechazado'}` 
+        }).then();
 
+        // 3. Enviar Email (Solo si es activo y tiene mail)
         if (nuevoEstado === 'activo' && email && email.includes('@')) {
-           const templateParams = { to_name: nombre, to_email: email, member_id: memberId, login_url: 'https://midnightclub.biz' };
-           emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_APROBADO, templateParams).catch(console.error);
+           const templateParams = { 
+               to_name: nombre, 
+               to_email: email, 
+               member_id: finalMemberId,      
+               member_pass: finalPassword, // <--- CORREGIDO: Coincide con tu plantilla HTML
+               login_url: 'https://midnightclub.biz' 
+           };
+           
+           emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_APROBADO, templateParams)
+             .then(() => console.log("Email enviado"))
+             .catch(e => alert("Error enviando email: " + JSON.stringify(e)));
         }
+        
         loadRequests(currentFilter);
       }
     }
