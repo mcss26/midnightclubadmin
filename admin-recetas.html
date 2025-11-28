@@ -10,11 +10,11 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <style>
-    /* Layout de 2 columnas para PC, 1 para móvil */
+    /* Layout */
     .recipe-container { display: grid; grid-template-columns: 1fr; gap: 20px; }
     @media(min-width: 768px) { .recipe-container { grid-template-columns: 350px 1fr; } }
 
-    /* Lista Izquierda (Menú) */
+    /* Lista Menú */
     .menu-item-row { 
         padding: 15px; border-bottom: 1px solid #222; cursor: pointer; 
         display: flex; justify-content: space-between; align-items: center;
@@ -23,12 +23,12 @@
     .menu-item-row:hover, .menu-item-row.active { background: #111; border-left: 3px solid var(--mc-accent-green); }
     .menu-price { font-family: monospace; color: #666; font-size: 11px; }
 
-    /* Panel Derecho (Receta) */
+    /* Panel Receta */
     .recipe-panel { background: #111; border: 1px solid #333; border-radius: 8px; padding: 25px; display: none; }
     .recipe-header { border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 20px; }
     .recipe-title { font-family: 'Outfit'; font-size: 24px; color: #fff; margin: 0; }
     
-    /* Métricas de Costo */
+    /* Métricas */
     .cost-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
     .cost-box { background: #000; padding: 10px; border-radius: 6px; border: 1px solid #222; text-align: center; }
     .cost-label { display: block; font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
@@ -36,7 +36,7 @@
     .cost-val.bad { color: var(--mc-red); }
     .cost-val.good { color: var(--mc-accent-green); }
 
-    /* Lista de Ingredientes */
+    /* Lista Ingredientes */
     .ing-list { list-style: none; padding: 0; margin: 0; }
     .ing-item { 
         display: flex; justify-content: space-between; align-items: center; 
@@ -74,7 +74,7 @@
         
         <div style="background: var(--mc-card-bg); border: 1px solid var(--mc-border); border-radius: 8px; height: 80vh; overflow-y: auto;">
             <div style="padding: 15px; border-bottom: 1px solid #333; position: sticky; top: 0; background: #111;">
-                <input type="text" id="searchMenu" class="search-input-admin" placeholder="🔍 Buscar Trago en Carta..." style="font-size: 12px; padding: 8px;">
+                <input type="text" id="searchMenu" class="search-input-admin" placeholder="🔍 Buscar Trago..." style="font-size: 12px; padding: 8px;">
             </div>
             <div id="menuList">
                 <div class="loading-state">Cargando carta...</div>
@@ -85,13 +85,13 @@
             <input type="hidden" id="currentItemId">
             
             <div class="recipe-header">
-                <h2 id="currentItemName" class="recipe-title">Selecciona un trago</h2>
+                <h2 id="currentItemName" class="recipe-title">--</h2>
                 <span id="currentItemPrice" style="color: var(--mc-accent-green); font-weight: 700;">--</span>
             </div>
 
             <div class="cost-grid">
                 <div class="cost-box">
-                    <span class="cost-label">Costo Insumos</span>
+                    <span class="cost-label">Costo Total</span>
                     <div id="totalCost" class="cost-val">$ 0</div>
                 </div>
                 <div class="cost-box">
@@ -99,23 +99,22 @@
                     <div id="grossMargin" class="cost-val">$ 0</div>
                 </div>
                 <div class="cost-box">
-                    <span class="cost-label">Rentabilidad %</span>
+                    <span class="cost-label">Rentabilidad</span>
                     <div id="marginPercent" class="cost-val">0%</div>
                 </div>
             </div>
 
-            <h3 style="font-size:12px; color:#888; text-transform:uppercase; margin-top:30px;">Ingredientes (Fórmula)</h3>
-            <ul id="ingredientsList" class="ing-list">
-                </ul>
+            <h3 style="font-size:12px; color:#888; text-transform:uppercase; margin-top:30px;">Ingredientes</h3>
+            <ul id="ingredientsList" class="ing-list"></ul>
 
             <div class="sku-search-box">
-                <label style="font-size:10px; color:#666; display:block; margin-bottom:5px;">AGREGAR SKU (INSUMO)</label>
-                <input type="text" id="skuInput" class="search-input-admin" placeholder="Escribe para buscar insumo..." autocomplete="off">
+                <label style="font-size:10px; color:#666; display:block; margin-bottom:5px;">AGREGAR INSUMO</label>
+                <input type="text" id="skuInput" class="search-input-admin" placeholder="Escribe para buscar (ej: Fernet)..." autocomplete="off">
                 <div id="skuResults" class="sku-results"></div>
             </div>
             
             <div id="qtyInputContainer" style="display:none; margin-top: 10px; gap:10px; align-items:center;">
-                <input type="number" id="qtyInput" class="search-input-admin" placeholder="Cantidad" style="width: 100px;">
+                <input type="number" id="qtyInput" class="search-input-admin" placeholder="Cant." style="width: 100px;">
                 <select id="unitInput" class="search-input-admin" style="width: 80px;">
                     <option value="ml">ml</option>
                     <option value="un">un</option>
@@ -132,7 +131,6 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // SEGURIDAD
     const user = localStorage.getItem('mc_admin_user') || 'Desconocido';
     const role = localStorage.getItem('mc_admin_role') || 'invitado';
     document.getElementById('roleBadge').innerText = user + ' | ' + role.toUpperCase();
@@ -147,7 +145,6 @@
 
     window.addEventListener('load', loadMenu);
 
-    // 1. CARGAR LISTA DE TRAGOS (IZQUIERDA)
     async function loadMenu() {
         const { data } = await client.from('menu_items').select('*').order('name');
         menuItems = data || [];
@@ -166,18 +163,13 @@
                     <div style="color:#fff; font-weight:700; font-size:13px;">${item.name}</div>
                     <div class="menu-price">$${item.price}</div>
                 </div>
-                <div style="font-size:10px; color:#444;">ID: ${item.id}</div>
             </div>`;
         });
         container.innerHTML = html;
     }
 
-    // 2. SELECCIONAR TRAGO
     async function selectItem(id) {
-        // UI Active
         document.querySelectorAll('.menu-item-row').forEach(r => r.classList.remove('active'));
-        // (Visualmente se podría marcar, pero por simplicidad recargamos panel)
-        
         currentMenuItem = menuItems.find(i => i.id === id);
         
         document.getElementById('recipePanel').style.display = 'block';
@@ -188,22 +180,19 @@
         loadRecipe(id);
     }
 
-    // 3. CARGAR RECETA E INGREDIENTES
     async function loadRecipe(menuId) {
         const container = document.getElementById('ingredientsList');
-        container.innerHTML = '<li style="color:#666; font-size:12px;">Cargando ingredientes...</li>';
+        container.innerHTML = '<li style="color:#666; font-size:12px;">Cargando...</li>';
 
-        // Join manual: recipe_ingredients + inventory_skus
         const { data: recipeData, error } = await client
             .from('recipe_ingredients')
             .select(`
                 id, quantity_needed, unit_needed,
-                inventory_skus ( id, name, cost_price, volume_ml, unit_code )
+                inventory_skus ( id, name, cost_price, volume_ml )
             `)
             .eq('menu_item_id', menuId);
 
         if(error) { console.error(error); return; }
-
         renderIngredients(recipeData);
     }
 
@@ -213,7 +202,7 @@
         let html = '';
 
         if(!ingredients || ingredients.length === 0) {
-            container.innerHTML = '<li style="color:#666; padding:20px; text-align:center;">Sin ingredientes definidos.<br>Usa el buscador para agregar.</li>';
+            container.innerHTML = '<li style="color:#666; padding:20px; text-align:center;">Sin ingredientes.</li>';
             updateMetrics(0);
             return;
         }
@@ -222,16 +211,19 @@
             const sku = ing.inventory_skus;
             if(!sku) return;
 
-            // CÁLCULO DE COSTO REAL
-            // Si el SKU tiene "volume_ml" (ej: 750) y costo (ej: 12000)
-            // Costo = (12000 / 750) * cantidad_usada
+            // --- LÓGICA DE COSTEO CORREGIDA ---
             let cost = 0;
-            if (sku.volume_ml > 0 && sku.cost_price > 0) {
-                const costPerUnit = sku.cost_price / sku.volume_ml;
-                cost = costPerUnit * ing.quantity_needed;
+            
+            if (ing.unit_needed === 'un') {
+                // Si la receta pide UNIDADES (ej: 1 Botella), costo = Precio Total * Cantidad
+                cost = sku.cost_price * ing.quantity_needed;
+            } else if (ing.unit_needed === 'ml' && sku.volume_ml > 0) {
+                // Si la receta pide ML (ej: 50ml), costo = (Precio / Volumen) * Cantidad
+                const costPerMl = sku.cost_price / sku.volume_ml;
+                cost = costPerMl * ing.quantity_needed;
             } else {
-                // Si no hay volumen (ej: unidad huevo), asumimos 1 a 1 si coincide
-                cost = sku.cost_price * ing.quantity_needed; 
+                // Fallback (ej: pide ml pero SKU no tiene volumen definido)
+                cost = 0; 
             }
             
             totalCost += cost;
@@ -240,7 +232,7 @@
             <li class="ing-item">
                 <div>
                     <div class="ing-name">${sku.name}</div>
-                    <div style="font-size:10px; color:#666;">SKU Cost: $${sku.cost_price} / ${sku.volume_ml}${sku.unit_code || 'ml'}</div>
+                    <div style="font-size:10px; color:#666;">Costo Insumo: $${sku.cost_price}</div>
                 </div>
                 <div style="display:flex; align-items:center;">
                     <span class="ing-qty">${ing.quantity_needed} ${ing.unit_needed}</span>
@@ -267,7 +259,7 @@
         pEl.className = 'cost-val ' + (percent < 50 ? 'bad' : 'good');
     }
 
-    // 4. BUSCADOR DE SKUS (Typeahead)
+    // Buscador SKU
     const skuInput = document.getElementById('skuInput');
     const skuResults = document.getElementById('skuResults');
 
@@ -278,13 +270,13 @@
         const { data } = await client.from('inventory_skus')
             .select('id, name, volume_ml, cost_price')
             .ilike('name', `%${term}%`)
-            .limit(5);
+            .limit(10);
 
         if(data && data.length > 0) {
             skuResults.innerHTML = data.map(s => `
-                <div class="sku-option" onclick="selectSku(${s.id}, '${s.name.replace(/'/g,"")}', ${s.volume_ml})">
+                <div class="sku-option" onclick="selectSku(${s.id}, '${s.name.replace(/'/g,"")}')">
                     <div style="color:#fff; font-weight:700;">${s.name}</div>
-                    <div style="color:#888; font-size:10px;">${s.volume_ml}ml - $${s.cost_price}</div>
+                    <div style="color:#888; font-size:10px;">${s.volume_ml || '?'} ml - $${s.cost_price}</div>
                 </div>
             `).join('');
             skuResults.style.display = 'block';
@@ -293,7 +285,7 @@
         }
     });
 
-    function selectSku(id, name, vol) {
+    function selectSku(id, name) {
         selectedSku = id;
         skuInput.value = name;
         skuResults.style.display = 'none';
@@ -301,7 +293,6 @@
         document.getElementById('qtyInput').focus();
     }
 
-    // 5. AGREGAR / BORRAR
     async function addIngredient() {
         const qty = parseFloat(document.getElementById('qtyInput').value);
         const unit = document.getElementById('unitInput').value;
@@ -316,7 +307,6 @@
             unit_needed: unit
         });
 
-        // Limpiar y recargar
         skuInput.value = '';
         document.getElementById('qtyInput').value = '';
         document.getElementById('qtyInputContainer').style.display = 'none';
@@ -330,13 +320,11 @@
         loadRecipe(document.getElementById('currentItemId').value);
     }
 
-    // Filtro Menu Lateral
     document.getElementById('searchMenu').addEventListener('input', (e)=>{
         const term = e.target.value.toLowerCase();
         const filtered = menuItems.filter(i => i.name.toLowerCase().includes(term));
         renderMenu(filtered);
     });
-
   </script>
 </body>
 </html>
