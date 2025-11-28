@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Midnight Admin — Master SKU</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin-styles.css" />
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+
+  <style>
+    /* Estilos Específicos para SKUs */
+    .sku-stats { display: flex; gap: 15px; margin-bottom: 25px; }
+    .stat-box { background: #111; border: 1px solid #333; border-radius: 8px; padding: 15px; flex: 1; display: flex; flex-direction: column; justify-content: center; }
+    .stat-label { font-size: 10px; color: #888; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+    .stat-val { font-size: 24px; font-weight: 800; color: #fff; font-family: 'Outfit'; }
+    
+    .sku-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .sku-table th { text-align: left; padding: 12px; color: #666; border-bottom: 1px solid #333; text-transform: uppercase; font-size: 10px; }
+    .sku-table td { padding: 12px; border-bottom: 1px solid #222; color: #ccc; }
+    .sku-table tr:hover td { background: #0a0a0a; color: #fff; }
+    
+    .col-costo { text-align: right; font-family: monospace; font-size: 13px; color: var(--mc-accent-green); font-weight: 700; }
+    .col-ml { text-align: right; color: #888; font-family: monospace; }
+    .badge-cat { padding: 3px 6px; border-radius: 4px; background: #222; color: #aaa; font-size: 9px; text-transform: uppercase; border: 1px solid #333; }
+
+    /* Botón Importar (Input file oculto) */
+    #fileInput { display: none; }
+    .btn-import { 
+        background: #fff; color: #000; border: none; padding: 10px 20px; 
+        font-weight: 800; text-transform: uppercase; cursor: pointer; border-radius: 4px;
+        display: flex; align-items: center; gap: 8px;
+    }
+    .btn-import:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+
+  <header class="admin-header">
+    <div class="admin-logo">MIDNIGHT<span style="color: var(--mc-accent-green);">INGENIERÍA</span> / SKUs</div>
+    <div style="display:flex; gap:15px; align-items:center;">
+        <span id="roleBadge" style="font-size:10px; border:1px solid #333; padding:4px 8px; border-radius:4px; color:#888;"></span>
+        <button onclick="window.location.href='index.html'" class="btn-logout">VOLVER</button>
+    </div>
+  </header>
+
+  <div class="admin-container">
+    <main>
+        <div class="section-header">
+            <div>
+                <h2 class="section-title">Master de Insumos</h2>
+                <p style="color:#666; font-size:12px; margin-top:5px;">Base de datos de costos sincronizada con GBol.</p>
+            </div>
+            <div>
+                <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" onchange="handleFile(this)">
+                <button onclick="document.getElementById('fileInput').click()" class="btn-import">
+                    📤 Importar Excel GBol
+                </button>
+            </div>
+        </div>
+
+        <div class="sku-stats">
+            <div class="stat-box">
+                <span class="stat-label">Total SKUs</span>
+                <span class="stat-val" id="totalCount">--</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Valorización (Costo)</span>
+                <span class="stat-val" id="totalValue">--</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">Última Sincronización</span>
+                <span class="stat-val" id="lastSync" style="font-size:16px; color:#888;">--</span>
+            </div>
+        </div>
+
+        <div class="search-bar-container">
+            <input type="text" id="searchSku" class="search-input-admin" placeholder="🔍 Buscar por Nombre, Código o Categoría...">
+        </div>
+
+        <div id="tableContainer">
+            <div class="loading-state">Cargando datos...</div>
+        </div>
+
+    </main>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // SEGURIDAD
+    const user = localStorage.getItem('mc_admin_user') || 'Desconocido';
+    const role = localStorage.getItem('mc_admin_role') || 'invitado';
+    document.getElementById('roleBadge').innerText = user + ' | ' + role.toUpperCase();
+
+    // Solo Gerencia y Admin pueden ver costos sensibles
+    if (!['superadmin', 'admin'].includes(role)) {
+        document.querySelector('main').innerHTML = '<div class="error-state">ACCESO DENEGADO: Nivel insuficiente para ver costos.</div>';
+    }
+
+    let allSkus = [];
+
+    window.addEventListener('load', loadSkus);
+
+    // --- CARGAR DATOS ---
+    async function loadSkus() {
+        const { data, error } = await client.from('inventory_skus').select('*').order('name');
+        
+        if (error) { 
+            document.getElementById('tableContainer').innerHTML = `<div class="error-state">Error: ${error.message}</div>`; 
+            return; 
+        }
+
+        allSkus = data;
+        updateStats();
+        renderTable(allSkus);
+    }
+
+    function renderTable(data) {
+        if (data.length === 0) {
+            document.getElementById('tableContainer').innerHTML = '<div class="empty-state">No hay insumos cargados. Importa el Excel de GBol.</div>';
+            return;
+        }
+
+        let html = `
+        <table class="sku-table">
+            <thead>
+                <tr>
+                    <th>Código (GBol)</th>
+                    <th>Insumo</th>
+                    <th>Categoría</th>
+                    <th style="text-align:right">Contenido</th>
+                    <th style="text-align:right">Costo Unit.</th>
+                    <th style="text-align:right">Costo x ML</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+        data.forEach(item => {
+            const costoFmt = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(item.cost_price);
+            
+            // Calculo Costo por ML (Vital para recetas)
+            let costoXml = '-';
+            if(item.volume_ml > 0 && item.cost_price > 0) {
+                const val = item.cost_price / item.volume_ml;
+                costoXml = '$ ' + val.toFixed(2);
+            }
+
+            html += `
+                <tr>
+                    <td style="font-family:monospace; color:#666;">${item.external_id}</td>
+                    <td style="font-weight:700; color:#fff;">${item.name}</td>
+                    <td><span class="badge-cat">${item.category || 'OTROS'}</span></td>
+                    <td class="col-ml">${item.volume_ml > 0 ? item.volume_ml + ' ml' : '-'}</td>
+                    <td class="col-costo">${costoFmt}</td>
+                    <td class="col-costo" style="color:#666;">${costoXml}</td>
+                </tr>`;
+        });
+
+        html += '</tbody></table>';
+        document.getElementById('tableContainer').innerHTML = html;
+    }
+
+    // --- LÓGICA DE IMPORTACIÓN EXCEL (SHEETJS) ---
+    async function handleFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        
+        // Feedback visual
+        document.querySelector('.btn-import').innerText = "PROCESANDO...";
+        document.querySelector('.btn-import').disabled = true;
+
+        reader.onload = async (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // Leemos la primera hoja
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                
+                // Convertimos a JSON crudo
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                
+                // PROCESAMIENTO INTELIGENTE
+                const processedData = jsonData.map(row => {
+                    // Mapeo flexible de columnas (Busca 'Codigo' o 'SKU', 'Articulo' o 'Nombre')
+                    // Ajustado al archivo "COSTOS + ML.xlsx"
+                    const codigo = row['Codigo'] || row['codigo'] || row['CODIGO'];
+                    const nombre = row['Articulo'] || row['articulo'] || row['ARTICULO'] || row['Nombre'];
+                    const costo = row['Costo'] || row['costo'] || row['COSTO'] || 0;
+                    const ml = row['ml'] || row['ML'] || row['Ml'] || 0;
+
+                    if (!codigo || !nombre) return null; // Saltar filas vacías
+
+                    return {
+                        external_id: String(codigo), // Forzar string para ID
+                        name: String(nombre).toUpperCase(),
+                        cost_price: parseFloat(costo) || 0,
+                        volume_ml: parseFloat(ml) || 0,
+                        category: detectCategory(nombre), // LA MAGIA
+                        last_updated: new Date()
+                    };
+                }).filter(item => item !== null);
+
+                // ENVIAR A SUPABASE (Upsert masivo)
+                if (processedData.length > 0) {
+                    const { error } = await client.from('inventory_skus').upsert(processedData, { onConflict: 'external_id' });
+                    
+                    if (error) throw error;
+
+                    // Loguear
+                    await client.from('admin_logs').insert({ 
+                        admin_name: user, 
+                        action: 'IMPORT_GBOL', 
+                        details: `Actualizados ${processedData.length} SKUs` 
+                    });
+
+                    alert(`¡Éxito! Se actualizaron ${processedData.length} insumos.`);
+                    loadSkus(); // Recargar tabla
+                } else {
+                    alert("No se encontraron datos válidos en el Excel. Revisa las columnas (Codigo, Articulo, Costo, ml).");
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert("Error al procesar archivo: " + err.message);
+            } finally {
+                document.querySelector('.btn-import').innerText = "📤 Importar Excel GBol";
+                document.querySelector('.btn-import').disabled = false;
+                input.value = ''; // Limpiar input
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // --- INTELIGENCIA ARTIFICIAL (Categorización por Palabras Clave) ---
+    function detectCategory(name) {
+        const n = name.toUpperCase();
+        if (n.includes('FERNET') || n.includes('APEROL') || n.includes('CAMPARI') || n.includes('HODL')) return 'APERITIVO';
+        if (n.includes('VODKA') || n.includes('SMIRNOFF') || n.includes('ABSOLUT') || n.includes('SKYY') || n.includes('SERNOVA')) return 'VODKA';
+        if (n.includes('GIN') || n.includes('BOMBAY') || n.includes('BEEFEATER') || n.includes('TANQUERAY') || n.includes('BRIGHTON')) return 'GIN';
+        if (n.includes('WHISK') || n.includes('JOHNNIE') || n.includes('JAMESON') || n.includes('CHIVAS')) return 'WHISKY';
+        if (n.includes('RON') || n.includes('HAVANA') || n.includes('MALIBU')) return 'RON';
+        if (n.includes('CERVEZA') || n.includes('CORONA') || n.includes('BUD') || n.includes('HEINEKEN')) return 'CERVEZA';
+        if (n.includes('VINO') || n.includes('TINTO') || n.includes('MALBEC')) return 'VINO';
+        if (n.includes('CHAMP') || n.includes('ESPUMANTE') || n.includes('MUMM') || n.includes('CHANDON') || n.includes('BARON')) return 'ESPUMANTE';
+        if (n.includes('SPEED') || n.includes('RED BULL') || n.includes('MONSTER')) return 'ENERGIZANTE';
+        if (n.includes('AGUA') || n.includes('COCA') || n.includes('SPRITE') || n.includes('TONICA') || n.includes('JUGO') || n.includes('GASEOSA')) return 'SIN ALCOHOL';
+        if (n.includes('HIELO')) return 'INSUMO';
+        return 'OTROS';
+    }
+
+    // --- BUSCADOR ---
+    document.getElementById('searchSku').addEventListener('input', (e) => {
+        const term = e.target.value.toLowerCase();
+        const filtered = allSkus.filter(i => 
+            i.name.toLowerCase().includes(term) || 
+            i.external_id.toLowerCase().includes(term) ||
+            (i.category && i.category.toLowerCase().includes(term))
+        );
+        renderTable(filtered);
+    });
+
+    function updateStats() {
+        document.getElementById('totalCount').innerText = allSkus.length;
+        // Sumar todo el stock valorizado (si tuvieramos stock, ahora sumamos costo unitario como referencia)
+        // Como es Master, sumamos cuantos items hay
+        const totalVal = allSkus.reduce((acc, i) => acc + (i.cost_price || 0), 0); // Suma de costos unitarios (referencial)
+        document.getElementById('totalValue').innerText = "$ " + new Intl.NumberFormat('es-AR', { notation: "compact" }).format(totalVal);
+        
+        if(allSkus.length > 0) {
+            const date = new Date(allSkus[0].last_updated || allSkus[0].created_at);
+            document.getElementById('lastSync').innerText = date.toLocaleDateString();
+        }
+    }
+  </script>
+</body>
+</html>
