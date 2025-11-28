@@ -10,12 +10,29 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <style>
+    /* Estilos base */
     .search-bar-container { margin-bottom: 20px; }
     .search-input-admin { width: 100%; padding: 12px 15px; background: #111; border: 1px solid #444; color: #fff; font-size: 14px; border-radius: 4px; outline: none; font-family: 'Inter'; }
     .insta-toolbar { background: var(--mc-card-bg); border: 1px solid var(--mc-border); padding: 15px; display: flex; align-items: center; gap: 10px; margin-bottom: 20px; border-radius: 8px; }
     .insta-input { background: #000; border: 1px solid #444; color: #fff; padding: 8px; width: 60px; text-align: center; font-weight: 700; border-radius: 4px; }
     .btn-bulk { background: #fff; color: #000; border: none; padding: 8px 15px; font-weight: 800; cursor: pointer; font-size: 11px; border-radius: 4px; flex: 1; text-transform: uppercase; transition: opacity 0.2s; }
     .btn-back { text-decoration: none; color: #888; font-size: 12px; display: flex; align-items: center; gap: 5px; margin-bottom: 20px; font-weight: 600; }
+
+    /* NUEVOS ESTILOS PARA NUMERACIÓN Y ACCIONES */
+    .req-index {
+        font-family: 'Outfit', sans-serif; font-size: 24px; font-weight: 900; color: #333;
+        margin-right: 20px; min-width: 30px; text-align: right;
+    }
+    .btn-trash {
+        background: transparent; border: 1px solid #333; color: #666; padding: 10px;
+        border-radius: 6px; cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center;
+    }
+    .btn-trash:hover { border-color: var(--mc-red); color: var(--mc-red); background: rgba(232, 55, 47, 0.1); }
+    
+    .btn-revive { background: #fff; color: #000; } /* Botón Reactivar */
+    .btn-ban { background: #333; color: #ccc; border: 1px solid #555; } /* Botón Dar de Baja */
+    
+    .req-actions { display: flex; gap: 8px; align-items: center; }
   </style>
 </head>
 <body>
@@ -71,8 +88,6 @@
     // --- SEGURIDAD RBAC ---
     const role = localStorage.getItem('mc_admin_role') || 'invitado';
     const user = localStorage.getItem('mc_admin_user') || 'Desconocido';
-
-    // QUIÉN PUEDE APROBAR: Superadmin, Admin y Manager (CXMR)
     const canApprove = ['superadmin', 'admin', 'manager'].includes(role);
 
     let currentFilter = 'pendiente';
@@ -117,44 +132,69 @@
       if (data.length === 0) { listContainer.innerHTML = '<div class="empty-state">No se encontraron resultados.</div>'; return; }
 
       let html = '';
-      data.forEach(req => {
+      
+      // LOGICA DE RENDERIZADO CON NUMERACIÓN
+      data.forEach((req, index) => {
         const safeName = req.nombre ? req.nombre.replace(/'/g, "\\'") : 'Usuario';
         const safeEmail = req.email || '';
         const safeMemberID = req.member_id || '';
         let rightPanel = ''; 
         let borderColor = '';
 
-        if (req.status === 'pendiente') {
-            borderColor = 'var(--mc-red)';
-            if (canApprove) {
-                // TIENE PERMISO
+        // Definir acciones según estado
+        if (canApprove) {
+            // USUARIO CON PERMISOS (Superadmin, Admin, Manager)
+            
+            if (req.status === 'pendiente') {
+                borderColor = 'var(--mc-red)';
                 rightPanel = `
                   <div class="req-actions">
                     <button class="btn-action btn-approve" onclick="procesar('${req.id}', 'activo', '${safeName}', '${safeEmail}', '${safeMemberID}')">APROBAR</button>
                     <button class="btn-action btn-reject" onclick="procesar('${req.id}', 'rechazado', '${safeName}', '${safeEmail}')">RECHAZAR</button>
+                    <button class="btn-trash" onclick="eliminar('${req.id}', '${safeName}')" title="Eliminar Definitivamente">🗑️</button>
                   </div>`;
-            } else {
-                // SOLO LECTURA
-                rightPanel = `<span style="color:#666; font-size:9px; font-weight:700; border:1px solid #333; padding:5px;">👁️ LECTURA</span>`;
+            
+            } else if (req.status === 'activo') {
+                borderColor = 'var(--mc-accent-green)';
+                rightPanel = `
+                  <div class="req-actions">
+                    <span class="status-badge status-active" style="margin-right:10px;">ACTIVO</span>
+                    <button class="btn-action btn-ban" onclick="procesar('${req.id}', 'rechazado', '${safeName}', '${safeEmail}')" title="Dar de Baja">BAJA</button>
+                    <button class="btn-trash" onclick="eliminar('${req.id}', '${safeName}')" title="Eliminar Definitivamente">🗑️</button>
+                  </div>`;
+            
+            } else { // Rechazado
+                borderColor = '#666';
+                rightPanel = `
+                  <div class="req-actions">
+                    <span class="status-badge status-rejected" style="margin-right:10px;">RECHAZADO</span>
+                    <button class="btn-action btn-revive" onclick="procesar('${req.id}', 'activo', '${safeName}', '${safeEmail}', '${safeMemberID}')" title="Reactivar Socio">REACTIVAR</button>
+                    <button class="btn-trash" onclick="eliminar('${req.id}', '${safeName}')" title="Eliminar Definitivamente">🗑️</button>
+                  </div>`;
             }
-        } else if (req.status === 'activo') {
-            borderColor = 'var(--mc-accent-green)';
-            rightPanel = `<span class="status-badge status-active">ACTIVO ✅</span>`;
+
         } else {
-             borderColor = '#666';
-             rightPanel = `<span class="status-badge status-rejected">RECHAZADO ❌</span>`;
+            // USUARIO SIN PERMISOS (Operativo)
+            borderColor = '#333';
+            const badge = req.status === 'activo' ? '✅ ACTIVO' : (req.status==='pendiente' ? '⏳ PENDIENTE' : '❌ RECHAZADO');
+            rightPanel = `<span style="color:#666; font-size:10px; font-weight:700; border:1px solid #333; padding:5px;">${badge}</span>`;
         }
 
         html += `
           <div class="request-card" style="border-left: 4px solid ${borderColor}">
-            <div class="req-info">
-              <h3>${req.nombre} <span class="req-id-badge">${req.member_id || 'Sin ID'}</span></h3>
-              <div class="req-detail-row"><span class="req-detail">🎂 ${req.nacimiento || '—'}</span><span class="req-detail">📱 ${req.telefono}</span></div>
-              <div class="req-detail-row">
-                <span class="req-detail">📸 <a href="https://instagram.com/${req.instagram}" target="_blank" style="color:inherit; text-decoration:underline;">${req.instagram}</a></span>
-                <span class="req-detail">📧 ${req.email}</span>
-              </div>
-              <div class="req-pass"><span class="pass-label">ACCESO INICIAL:</span> ${req.access_password || '—'}</div>
+            <div style="display:flex; align-items:center; width:100%;">
+                
+                <div class="req-index">#${index + 1}</div>
+                
+                <div class="req-info" style="flex:1;">
+                  <h3>${req.nombre} <span class="req-id-badge">${req.member_id || 'Sin ID'}</span></h3>
+                  <div class="req-detail-row"><span class="req-detail">🎂 ${req.nacimiento || '—'}</span><span class="req-detail">📱 ${req.telefono}</span></div>
+                  <div class="req-detail-row">
+                    <span class="req-detail">📸 <a href="https://instagram.com/${req.instagram}" target="_blank" style="color:inherit; text-decoration:underline;">${req.instagram}</a></span>
+                    <span class="req-detail">📧 ${req.email}</span>
+                  </div>
+                  <div class="req-pass"><span class="pass-label">ACCESO INICIAL:</span> ${req.access_password || '—'}</div>
+                </div>
             </div>
             ${rightPanel}
           </div>`;
@@ -163,52 +203,53 @@
       if (!canApprove) document.querySelector('.section-title').innerHTML = 'Solicitudes <span style="font-size:10px; border:1px solid #444; padding:2px 5px; color:#888;">LECTURA</span>';
     }
 
-    // --- FUNCIÓN PRINCIPAL CORREGIDA ---
+    // --- PROCESAR CAMBIO DE ESTADO ---
     async function procesar(id, nuevoEstado, nombre, email, currentMemberId) {
       if(!canApprove) return;
       
+      const accionTexto = nuevoEstado === 'activo' ? 'ACTIVAR' : 'DAR DE BAJA';
+      if(!confirm(`¿Estás seguro de ${accionTexto} a ${nombre}?`)) return;
+
       let updates = { status: nuevoEstado };
       let finalMemberId = currentMemberId;
       let finalPassword = '---';
 
+      // Si pasamos a ACTIVO (aprobación inicial o reactivación)
       if (nuevoEstado === 'activo') {
-          // Generar ID si falta
+          // Generar ID si no tiene
           if (!finalMemberId || finalMemberId === 'Sin ID' || finalMemberId.length < 3) {
               const randomNum = Math.floor(1000 + Math.random() * 9000); 
               finalMemberId = 'MC-' + randomNum;
               updates.member_id = finalMemberId;
           }
-          // Generar Password SIEMPRE al aprobar
+          // Regenerar password para que tenga acceso fresco
           finalPassword = Math.random().toString(36).slice(-6).toUpperCase();
-          updates.access_password = finalPassword; // Para Supabase (columna access_password)
+          updates.access_password = finalPassword;
       }
 
       document.body.style.cursor = 'wait';
-      
-      // 1. Guardar en Base de Datos
       const { error } = await client.from('members').update(updates).eq('id', id);
       document.body.style.cursor = 'default';
 
       if(error) { 
           alert("Error actualizando DB: " + error.message); 
       } else { 
-        // 2. Log de Auditoría
+        // Log
         client.from('admin_logs').insert({ 
             admin_name: user, 
-            action: nuevoEstado === 'activo' ? 'APROBAR' : 'RECHAZAR', 
-            details: `${nombre} -> ${finalMemberId || 'Rechazado'}` 
+            action: nuevoEstado === 'activo' ? 'APROBAR/REACTIVAR' : 'RECHAZAR/BAJA', 
+            details: `${nombre} -> ${nuevoEstado}` 
         }).then();
 
-        // 3. Enviar Email (Solo si es activo y tiene mail)
+        // Email (Solo si activamos y hay mail)
         if (nuevoEstado === 'activo' && email && email.includes('@')) {
            const templateParams = { 
                to_name: nombre, 
                to_email: email, 
                member_id: finalMemberId,      
-               member_pass: finalPassword, // <--- CORREGIDO: Coincide con tu plantilla HTML
+               member_pass: finalPassword, // COINCIDE CON PLANTILLA
                login_url: 'https://midnightclub.biz' 
            };
-           
            emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_APROBADO, templateParams)
              .then(() => console.log("Email enviado"))
              .catch(e => alert("Error enviando email: " + JSON.stringify(e)));
@@ -216,6 +257,23 @@
         
         loadRequests(currentFilter);
       }
+    }
+
+    // --- ELIMINAR PERMANENTEMENTE ---
+    async function eliminar(id, nombre) {
+        if(!canApprove) return;
+        if(!confirm(`⚠️ PELIGRO ⚠️\n¿Eliminar DEFINITIVAMENTE a ${nombre}?\nEsta acción no se puede deshacer.`)) return;
+
+        document.body.style.cursor = 'wait';
+        const { error } = await client.from('members').delete().eq('id', id);
+        document.body.style.cursor = 'default';
+
+        if(error) {
+            alert("Error al eliminar: " + error.message);
+        } else {
+            client.from('admin_logs').insert({ admin_name: user, action: 'ELIMINAR_DB', details: `Borró a ${nombre}` }).then();
+            loadRequests(currentFilter);
+        }
     }
 
     function setupSearch() {
