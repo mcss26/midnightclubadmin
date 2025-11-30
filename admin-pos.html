@@ -94,10 +94,10 @@
         </select>
         
         <label style="color:#666; font-size:10px; text-transform:uppercase;">ID Externo</label>
-        <input type="text" id="editExtId" class="modal-input" placeholder="Zoco: TID (ej: 69138235) / GBol: Pto Venta (ej: 0004)">
+        <input type="text" id="editExtId" class="modal-input" placeholder="Zoco: TID / GBol: Pto Venta">
         
-        <label style="color:#666; font-size:10px; text-transform:uppercase;">Nombre de Caja (Tu Referencia)</label>
-        <input type="text" id="editName" class="modal-input" placeholder="Ej: CAJA 4 - PATIO">
+        <label style="color:#666; font-size:10px; text-transform:uppercase;">Nombre de Caja</label>
+        <input type="text" id="editName" class="modal-input" placeholder="Ej: CAJA 4">
 
         <div class="modal-btns">
             <button onclick="closeModal()" class="btn-modal-cancel">CANCELAR</button>
@@ -112,7 +112,6 @@
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // Seguridad
     const user = localStorage.getItem('mc_admin_user') || 'Desconocido';
     const role = localStorage.getItem('mc_admin_role') || 'invitado';
     document.getElementById('roleBadge').innerText = user + ' | ' + role.toUpperCase();
@@ -155,7 +154,7 @@
         container.innerHTML = html;
     }
 
-    // --- IMPORTADOR AUTOMÁTICO (GBol) ---
+    // --- IMPORTADOR INTELIGENTE (Detecta filas ocultas) ---
     async function handleFile(input) {
         const file = input.files[0];
         if (!file) return;
@@ -168,39 +167,49 @@
             try {
                 const data = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(data, { type: 'array' });
-                
-                // Buscar la hoja correcta. En tu Excel, la data suele estar en la primera.
                 const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
                 
-                // Convertir a JSON crudo (detecta encabezados automáticamente)
-                // Usamos header:2 porque en tu excel a veces hay filas vacías arriba
-                // Pero XLSX suele ser inteligente. Probemos default primero.
-                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                // 1. Convertir a Array de Arrays para BUSCAR DONDE EMPIEZA LA TABLA
+                const rawData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
                 
-                // 1. Extraer Pares Únicos (ID - Nombre)
+                // Buscamos la fila que contiene el título 'ptovta' o 'Pto. Vta.'
+                let headerRowIndex = -1;
+                for (let i = 0; i < Math.min(rawData.length, 20); i++) {
+                    const rowStr = JSON.stringify(rawData[i]).toLowerCase();
+                    if (rowStr.includes('ptovta') || rowStr.includes('pto. vta.')) {
+                        headerRowIndex = i;
+                        break;
+                    }
+                }
+
+                if (headerRowIndex === -1) {
+                    alert("No se encontró la fila de encabezados (ptovta / cajanom). Revisa el archivo.");
+                    return;
+                }
+
+                // 2. Leer ahora sí usando esa fila como cabecera
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet, { range: headerRowIndex });
+                
                 const uniqueTerminals = {};
 
                 jsonData.forEach(row => {
-                    // Mapeo flexible de columnas basado en tu archivo
+                    // Mapeo flexible
                     const id = row['ptovta'] || row['Pto. Vta.'] || row['PtoVta'];
-                    const name = row['cajanom'] || row['caja'] || row['Caja'];
+                    const name = row['cajanom'] || row['caja'] || row['Caja'] || row['cajanom'];
 
                     if (id && name) {
                         const cleanId = String(id).trim();
-                        // Guardamos el último nombre encontrado para ese ID
                         uniqueTerminals[cleanId] = String(name).trim().toUpperCase();
                     }
                 });
 
-                // 2. Preparar Payload para Supabase
                 const payload = Object.entries(uniqueTerminals).map(([id, name]) => ({
                     provider: 'GBOL',
                     external_id: id,
-                    friendly_name: name // Se guardará tal cual viene (ej: BOLETERIA GENERAL 1)
+                    friendly_name: name
                 }));
 
                 if (payload.length > 0) {
-                    // UPSERT: Si ya existe el ID, actualiza el nombre. Si no, lo crea.
                     const { error } = await client.from('pos_terminals')
                         .upsert(payload, { onConflict: 'provider,external_id' });
                     
@@ -209,13 +218,13 @@
                     await client.from('admin_logs').insert({ 
                         admin_name: user, 
                         action: 'IMPORT_POS', 
-                        details: `Importados/Actualizados ${payload.length} puntos de venta GBol` 
+                        details: `Importados ${payload.length} puntos de venta GBol` 
                     });
 
                     alert(`¡Éxito! Se procesaron ${payload.length} puntos de venta.`);
-                    loadTerminals(); // Recargar lista visual
+                    loadTerminals();
                 } else {
-                    alert("No se encontraron columnas válidas (ptovta / cajanom) en el archivo.");
+                    alert("No se encontraron datos válidos después de detectar la cabecera.");
                 }
 
             } catch (err) {
@@ -230,9 +239,8 @@
         reader.readAsArrayBuffer(file);
     }
 
-    // Modal Logic
+    // Modal
     const modal = document.getElementById('posModal');
-    
     function openModal(id = null) {
         modal.style.display = 'flex';
         if(id) {
@@ -244,7 +252,7 @@
             document.getElementById('btnDelete').style.display = 'block';
         } else {
             document.getElementById('editId').value = '';
-            document.getElementById('editProv').value = 'ZOCO'; // Default
+            document.getElementById('editProv').value = 'ZOCO';
             document.getElementById('editExtId').value = '';
             document.getElementById('editName').value = '';
             document.getElementById('btnDelete').style.display = 'none';
@@ -262,24 +270,14 @@
 
         if(!data.external_id || !data.friendly_name) { alert("Completa todos los campos"); return; }
 
-        let error;
         if(id) {
-            const res = await client.from('pos_terminals').update(data).eq('id', id);
-            error = res.error;
-            if(!error) client.from('admin_logs').insert({ admin_name: user, action: 'EDIT_POS', details: `${data.provider} ${data.friendly_name}` }).then();
+            await client.from('pos_terminals').update(data).eq('id', id);
+            client.from('admin_logs').insert({ admin_name: user, action: 'EDIT_POS', details: `${data.provider} ${data.friendly_name}` }).then();
         } else {
-            const res = await client.from('pos_terminals').insert(data);
-            error = res.error;
-            if(!error) client.from('admin_logs').insert({ admin_name: user, action: 'NEW_POS', details: `${data.provider} ${data.friendly_name}` }).then();
+            await client.from('pos_terminals').insert(data);
+            client.from('admin_logs').insert({ admin_name: user, action: 'NEW_POS', details: `${data.provider} ${data.friendly_name}` }).then();
         }
-
-        if(error) {
-            if(error.code === '23505') alert("Error: Ya existe ese ID Externo para ese proveedor.");
-            else alert("Error al guardar: " + error.message);
-        } else {
-            closeModal();
-            loadTerminals();
-        }
+        closeModal(); loadTerminals();
     }
 
     async function deletePos() {
