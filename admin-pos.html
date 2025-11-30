@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Midnight Admin — POS Mapeo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin-styles.css" />
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+
+  <style>
+    .pos-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px; }
+    
+    .pos-card { 
+        background: #111; border: 1px solid #333; border-radius: 8px; padding: 20px; 
+        display: flex; justify-content: space-between; align-items: center;
+        transition: transform 0.2s;
+    }
+    .pos-card:hover { border-color: #555; transform: translateY(-2px); }
+    
+    .pos-info h4 { margin: 0 0 5px 0; color: #fff; font-family: 'Outfit'; text-transform: uppercase; font-size: 16px; }
+    .pos-meta { font-size: 11px; color: #666; font-family: monospace; display: flex; align-items: center; gap: 8px; }
+    
+    .badge-prov { 
+        padding: 2px 6px; border-radius: 4px; font-weight: 700; font-size: 10px; 
+        text-transform: uppercase; letter-spacing: 0.05em;
+    }
+    .prov-zoco { background: rgba(0, 234, 255, 0.15); color: #00eaff; border: 1px solid #00eaff; }
+    .prov-gbol { background: rgba(232, 55, 47, 0.15); color: var(--mc-red); border: 1px solid var(--mc-red); }
+
+    .btn-edit { background: none; border: 1px solid #444; color: #888; padding: 8px; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+    .btn-edit:hover { border-color: #fff; color: #fff; }
+
+    /* Botón Importar */
+    #fileInput { display: none; }
+    .btn-import { 
+        background: #fff; color: #000; border: none; padding: 8px 15px; 
+        font-weight: 800; text-transform: uppercase; cursor: pointer; border-radius: 4px;
+        font-size: 11px; margin-right: 10px;
+    }
+    .btn-import:hover { opacity: 0.9; }
+
+    /* Modal */
+    .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 200; display:none; justify-content:center; align-items:center; }
+    .modal-box { background: #111; border: 1px solid #444; padding: 30px; width: 90%; max-width: 400px; border-radius: 12px; }
+    .modal-input, .modal-select { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 12px; margin-bottom: 15px; outline: none; font-family: monospace; }
+    .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
+    .btn-modal-save { flex: 1; background: var(--mc-accent-green); border: none; padding: 12px; color: #000; font-weight: 800; cursor: pointer; }
+    .btn-modal-cancel { flex: 1; background: transparent; border: 1px solid #444; padding: 12px; color: #888; cursor: pointer; }
+  </style>
+</head>
+<body>
+
+  <header class="admin-header">
+    <div class="admin-logo">MIDNIGHT<span style="color: var(--mc-accent-green);">DATA</span> / POS</div>
+    <div style="display:flex; gap:15px; align-items:center;">
+        <span id="roleBadge" style="font-size:10px; border:1px solid #333; padding:4px 8px; border-radius:4px; color:#888;"></span>
+        <button onclick="window.location.href='index.html'" class="btn-logout">VOLVER</button>
+    </div>
+  </header>
+
+  <div class="admin-container">
+    <main>
+        <div class="section-header">
+            <div>
+                <h2 class="section-title">Mapeo de Terminales</h2>
+                <p style="color:#666; font-size:12px; margin-top:5px;">Conexión entre IDs de sistema y Cajas reales.</p>
+            </div>
+            <div style="display:flex; align-items:center;">
+                <input type="file" id="fileInput" accept=".xlsx, .xls, .csv" onchange="handleFile(this)">
+                <button onclick="document.getElementById('fileInput').click()" class="btn-import">📤 Importar GBol</button>
+                <button onclick="openModal()" class="btn-refresh" style="background:var(--mc-accent-green); color:#000; border:none; font-weight:800;">+ NUEVA</button>
+            </div>
+        </div>
+
+        <div id="posList" class="pos-grid">
+            <div class="loading-state">Cargando terminales...</div>
+        </div>
+    </main>
+  </div>
+
+  <div id="posModal" class="modal-overlay">
+    <div class="modal-box">
+        <h3 style="color:#fff; margin-top:0; font-family:'Outfit'; text-transform:uppercase;">Editar Terminal</h3>
+        <input type="hidden" id="editId">
+        
+        <label style="color:#666; font-size:10px; text-transform:uppercase;">Proveedor</label>
+        <select id="editProv" class="modal-select">
+            <option value="ZOCO">ZOCO (Posnet)</option>
+            <option value="GBOL">GBOL (Sistema)</option>
+        </select>
+        
+        <label style="color:#666; font-size:10px; text-transform:uppercase;">ID Externo</label>
+        <input type="text" id="editExtId" class="modal-input" placeholder="Zoco: TID (ej: 69138235) / GBol: Pto Venta (ej: 0004)">
+        
+        <label style="color:#666; font-size:10px; text-transform:uppercase;">Nombre de Caja (Tu Referencia)</label>
+        <input type="text" id="editName" class="modal-input" placeholder="Ej: CAJA 4 - PATIO">
+
+        <div class="modal-btns">
+            <button onclick="closeModal()" class="btn-modal-cancel">CANCELAR</button>
+            <button onclick="savePos()" class="btn-modal-save">GUARDAR</button>
+        </div>
+        <button onclick="deletePos()" id="btnDelete" style="width:100%; background:none; border:none; color:#444; font-size:10px; margin-top:15px; cursor:pointer; text-decoration:underline;">ELIMINAR MAPEO</button>
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Seguridad
+    const user = localStorage.getItem('mc_admin_user') || 'Desconocido';
+    const role = localStorage.getItem('mc_admin_role') || 'invitado';
+    document.getElementById('roleBadge').innerText = user + ' | ' + role.toUpperCase();
+
+    if (!['superadmin', 'admin'].includes(role)) {
+        document.querySelector('main').innerHTML = '<div class="error-state">ACCESO DENEGADO</div>';
+    }
+
+    let allTerminals = [];
+
+    window.addEventListener('load', loadTerminals);
+
+    async function loadTerminals() {
+        const { data, error } = await client.from('pos_terminals').select('*').order('provider').order('friendly_name');
+        if (error) { document.getElementById('posList').innerHTML = `<div class="error-state">Error: ${error.message}</div>`; return; }
+        allTerminals = data;
+        renderList(data);
+    }
+
+    function renderList(data) {
+        const container = document.getElementById('posList');
+        if(data.length === 0) { container.innerHTML = '<div class="empty-state">No hay terminales configuradas.</div>'; return; }
+
+        let html = '';
+        data.forEach(t => {
+            const badgeClass = t.provider === 'ZOCO' ? 'prov-zoco' : 'prov-gbol';
+            
+            html += `
+            <div class="pos-card">
+                <div class="pos-info">
+                    <h4>${t.friendly_name}</h4>
+                    <div class="pos-meta">
+                        <span class="badge-prov ${badgeClass}">${t.provider}</span>
+                        ID: <span style="color:#fff;">${t.external_id}</span>
+                    </div>
+                </div>
+                <button class="btn-edit" onclick="openModal(${t.id})">✏️</button>
+            </div>`;
+        });
+        container.innerHTML = html;
+    }
+
+    // --- IMPORTADOR AUTOMÁTICO (GBol) ---
+    async function handleFile(input) {
+        const file = input.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        document.querySelector('.btn-import').innerText = "LEYENDO...";
+        document.querySelector('.btn-import').disabled = true;
+
+        reader.onload = async (e) => {
+            try {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array' });
+                
+                // Buscar la hoja correcta. En tu Excel, la data suele estar en la primera.
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                
+                // Convertir a JSON crudo (detecta encabezados automáticamente)
+                // Usamos header:2 porque en tu excel a veces hay filas vacías arriba
+                // Pero XLSX suele ser inteligente. Probemos default primero.
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                
+                // 1. Extraer Pares Únicos (ID - Nombre)
+                const uniqueTerminals = {};
+
+                jsonData.forEach(row => {
+                    // Mapeo flexible de columnas basado en tu archivo
+                    const id = row['ptovta'] || row['Pto. Vta.'] || row['PtoVta'];
+                    const name = row['cajanom'] || row['caja'] || row['Caja'];
+
+                    if (id && name) {
+                        const cleanId = String(id).trim();
+                        // Guardamos el último nombre encontrado para ese ID
+                        uniqueTerminals[cleanId] = String(name).trim().toUpperCase();
+                    }
+                });
+
+                // 2. Preparar Payload para Supabase
+                const payload = Object.entries(uniqueTerminals).map(([id, name]) => ({
+                    provider: 'GBOL',
+                    external_id: id,
+                    friendly_name: name // Se guardará tal cual viene (ej: BOLETERIA GENERAL 1)
+                }));
+
+                if (payload.length > 0) {
+                    // UPSERT: Si ya existe el ID, actualiza el nombre. Si no, lo crea.
+                    const { error } = await client.from('pos_terminals')
+                        .upsert(payload, { onConflict: 'provider,external_id' });
+                    
+                    if (error) throw error;
+
+                    await client.from('admin_logs').insert({ 
+                        admin_name: user, 
+                        action: 'IMPORT_POS', 
+                        details: `Importados/Actualizados ${payload.length} puntos de venta GBol` 
+                    });
+
+                    alert(`¡Éxito! Se procesaron ${payload.length} puntos de venta.`);
+                    loadTerminals(); // Recargar lista visual
+                } else {
+                    alert("No se encontraron columnas válidas (ptovta / cajanom) en el archivo.");
+                }
+
+            } catch (err) {
+                console.error(err);
+                alert("Error al procesar: " + err.message);
+            } finally {
+                document.querySelector('.btn-import').innerText = "📤 Importar GBol";
+                document.querySelector('.btn-import').disabled = false;
+                input.value = '';
+            }
+        };
+        reader.readAsArrayBuffer(file);
+    }
+
+    // Modal Logic
+    const modal = document.getElementById('posModal');
+    
+    function openModal(id = null) {
+        modal.style.display = 'flex';
+        if(id) {
+            const t = allTerminals.find(i => i.id === id);
+            document.getElementById('editId').value = t.id;
+            document.getElementById('editProv').value = t.provider;
+            document.getElementById('editExtId').value = t.external_id;
+            document.getElementById('editName').value = t.friendly_name;
+            document.getElementById('btnDelete').style.display = 'block';
+        } else {
+            document.getElementById('editId').value = '';
+            document.getElementById('editProv').value = 'ZOCO'; // Default
+            document.getElementById('editExtId').value = '';
+            document.getElementById('editName').value = '';
+            document.getElementById('btnDelete').style.display = 'none';
+        }
+    }
+    function closeModal() { modal.style.display = 'none'; }
+
+    async function savePos() {
+        const id = document.getElementById('editId').value;
+        const data = {
+            provider: document.getElementById('editProv').value,
+            external_id: document.getElementById('editExtId').value.trim(),
+            friendly_name: document.getElementById('editName').value.trim().toUpperCase()
+        };
+
+        if(!data.external_id || !data.friendly_name) { alert("Completa todos los campos"); return; }
+
+        let error;
+        if(id) {
+            const res = await client.from('pos_terminals').update(data).eq('id', id);
+            error = res.error;
+            if(!error) client.from('admin_logs').insert({ admin_name: user, action: 'EDIT_POS', details: `${data.provider} ${data.friendly_name}` }).then();
+        } else {
+            const res = await client.from('pos_terminals').insert(data);
+            error = res.error;
+            if(!error) client.from('admin_logs').insert({ admin_name: user, action: 'NEW_POS', details: `${data.provider} ${data.friendly_name}` }).then();
+        }
+
+        if(error) {
+            if(error.code === '23505') alert("Error: Ya existe ese ID Externo para ese proveedor.");
+            else alert("Error al guardar: " + error.message);
+        } else {
+            closeModal();
+            loadTerminals();
+        }
+    }
+
+    async function deletePos() {
+        const id = document.getElementById('editId').value;
+        if(confirm("¿Eliminar este mapeo?")) {
+            await client.from('pos_terminals').delete().eq('id', id);
+            client.from('admin_logs').insert({ admin_name: user, action: 'DEL_POS', details: `ID ${id}` }).then();
+            closeModal(); loadTerminals();
+        }
+    }
+  </script>
+</body>
+</html>
