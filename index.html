@@ -83,7 +83,18 @@
 
     <div class="admin-container" style="max-width: 1200px;">
       
-      <div class="dashboard-section">
+      <div id="sectionStaff" class="dashboard-section" style="display:none;">
+        <div class="section-label" style="color: #fff;">Operación Caja</div>
+        <div class="dashboard-grid">
+            <a href="staff-cierre.html" class="dash-card" style="border-color: #fff; background: #222;">
+                <div class="dash-icon">🔒</div>
+                <h3 class="dash-title">Declaración<br>de Caja</h3>
+                <div class="dash-desc">Ingreso Ciego de Valores</div>
+            </a>
+        </div>
+      </div>
+
+      <div id="sectionWeb" class="dashboard-section">
         <div class="section-label lbl-web">CMS Web & Socios</div>
         <div class="dashboard-grid">
             <a href="admin-solicitudes.html" class="dash-card card-web">
@@ -128,15 +139,15 @@
                     <h3 class="dash-title">Recetario</h3>
                     <div class="dash-desc">Ingeniería de Menú</div>
                 </a>
-                <a href="#" class="dash-card card-master coming-soon">
-                    <div class="dash-icon">🚚</div>
-                    <h3 class="dash-title">Proveedores</h3>
-                    <div class="dash-desc">Directorio & Contactos</div>
-                </a>
                 <a href="admin-pos.html" class="dash-card card-master">
                     <div class="dash-icon">🔗</div>
                     <h3 class="dash-title">Mapeo POS</h3>
                     <div class="dash-desc">Conexión GBol/Zoco</div>
+                </a>
+                <a href="#" class="dash-card card-master coming-soon">
+                    <div class="dash-icon">🚚</div>
+                    <h3 class="dash-title">Proveedores</h3>
+                    <div class="dash-desc">Directorio & Contactos</div>
                 </a>
                 <a href="admin-logs.html" class="dash-card card-master">
                     <div class="dash-icon">🛡️</div>
@@ -149,19 +160,20 @@
         <div class="dashboard-section">
             <div class="section-label lbl-daily">2. Operación Noche (Diario)</div>
             <div class="dashboard-grid">
-                <a href="#" class="dash-card card-daily coming-soon">
+                <a href="admin-rrhh.html" class="dash-card card-daily">
                     <div class="dash-icon">👷</div>
-                    <h3 class="dash-title">Check-in Staff</h3>
-                    <div class="dash-desc">Fichaje QR & Dotación</div>
+                    <h3 class="dash-title">RRHH<br>& Dotación</h3>
+                    <div class="dash-desc">Fichaje y Pagos</div>
                 </a>
+                
                 <a href="#" class="dash-card card-daily coming-soon">
                     <div class="dash-icon">📊</div>
-                    <h3 class="dash-title">Apertura/Cierre<br>Barras</h3>
-                    <div class="dash-desc">Control Stock Físico</div>
+                    <h3 class="dash-title">Stock<br>Barras</h3>
+                    <div class="dash-desc">Aperturas y Conteos</div>
                 </a>
                 <a href="#" class="dash-card card-daily coming-soon">
-                    <div class="dash-icon">💵</div>
-                    <h3 class="dash-title">Rendición Caja</h3>
+                    <div class="dash-icon">🌜</div>
+                    <h3 class="dash-title">Cierre<br>de Noche</h3>
                     <div class="dash-desc">Cierre Ciego vs Sistema</div>
                 </a>
                 <a href="#" class="dash-card card-daily coming-soon">
@@ -200,11 +212,6 @@
                     <div class="dash-icon">📈</div>
                     <h3 class="dash-title">Reporte Mensual</h3>
                     <div class="dash-desc">P&L y Rentabilidad</div>
-                </a>
-                <a href="#" class="dash-card card-monthly coming-soon">
-                    <div class="dash-icon">🔭</div>
-                    <h3 class="dash-title">Proyección</h3>
-                    <div class="dash-desc">Presupuesto Mes Siguiente</div>
                 </a>
             </div>
         </div>
@@ -253,15 +260,25 @@
         document.getElementById('main-content').style.display = 'block';
         document.getElementById('userDisplay').innerText = `${user} [${role.toUpperCase()}]`;
 
-        // SEGURIDAD: Mostrar ERP Completo SOLO a Superadmin
-        // (Podrías agregar 'admin' si quieres que administración también vea)
-        if (role === 'superadmin') {
+        // LÓGICA DE VISIBILIDAD DE SECCIONES SEGÚN ROL
+        if (role === 'staff') {
+            // STAFF (Cajeros): Solo ven su sección
+            document.getElementById('sectionStaff').style.display = 'block';
+            document.getElementById('sectionWeb').style.display = 'none';
+            document.getElementById('sectionERP').style.display = 'none';
+        } else if (role === 'superadmin') {
+            // SUPERADMIN: Ve todo
+            document.getElementById('sectionStaff').style.display = 'block'; // Opcional, para testear
+            document.getElementById('sectionWeb').style.display = 'block';
             document.getElementById('sectionERP').style.display = 'block';
         } else {
-            document.getElementById('sectionERP').style.display = 'none';
+            // ADMIN / OPERATIVO / MANAGER: Ven Web (y Staff opcional)
+            document.getElementById('sectionStaff').style.display = 'none';
+            document.getElementById('sectionWeb').style.display = 'block';
+            document.getElementById('sectionERP').style.display = 'none'; // ERP Oculto para ellos por ahora
         }
 
-        loadDashboardCounts();
+        if(role !== 'staff') loadDashboardCounts();
     }
 
     function logout() {
