@@ -11,44 +11,47 @@
 
   <style>
     /* LAYOUT POR SECCIONES */
-    .dashboard-section { margin-bottom: 50px; }
+    .dashboard-section { margin-bottom: 40px; }
     .section-label { 
-      font-family: 'Outfit', sans-serif; font-size: 14px; color: var(--mc-red); 
+      font-family: 'Outfit', sans-serif; font-size: 14px; 
       text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 20px; 
-      border-bottom: 1px solid #333; padding-bottom: 10px; display: flex; justify-content: space-between;
+      border-bottom: 1px solid #333; padding-bottom: 10px;
     }
+    
+    /* Colores de Títulos */
+    .lbl-web { color: #fff; }
+    .lbl-master { color: #00eaff; } /* Cyan */
+    .lbl-daily { color: #cdfb3e; } /* Verde Neón */
+    .lbl-weekly { color: #d600ff; } /* Violeta */
+    .lbl-monthly { color: #FFD700; } /* Dorado */
 
     .dashboard-grid { 
-      display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 20px; 
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 15px; 
     }
 
     .dash-card { 
       background: var(--mc-card-bg); border: 1px solid var(--mc-border); border-radius: 12px; 
-      padding: 25px; text-align: left; transition: transform 0.2s, border-color 0.2s; 
-      text-decoration: none; display: flex; flex-direction: column; justify-content: space-between; height: 160px;
+      padding: 20px; text-align: left; transition: transform 0.2s, border-color 0.2s; 
+      text-decoration: none; display: flex; flex-direction: column; justify-content: space-between; height: 140px;
       position: relative; overflow: hidden;
     }
-    .dash-card:hover { transform: translateY(-5px); border-color: #555; }
+    .dash-card:hover { transform: translateY(-3px); border-color: #777; }
     
-    /* Colores por Tipo */
+    /* Bordes Hover por Tipo */
     .card-web:hover { border-color: #fff; }
-    .card-ops:hover { border-color: var(--mc-accent-green); }
-    .card-fin:hover { border-color: #FFD700; } /* Dorado */
-    .card-sys:hover { border-color: #00eaff; } /* Cyan */
+    .card-master:hover { border-color: #00eaff; }
+    .card-daily:hover { border-color: #cdfb3e; }
+    .card-weekly:hover { border-color: #d600ff; }
+    .card-monthly:hover { border-color: #FFD700; }
 
-    /* Elementos de la Tarjeta */
-    .dash-icon { font-size: 28px; margin-bottom: 15px; }
-    .dash-title { color: #fff; font-family: 'Outfit', sans-serif; font-size: 18px; text-transform: uppercase; margin: 0; line-height: 1.1; }
-    .dash-stat { font-size: 32px; font-weight: 900; color: #fff; margin-top: auto; }
-    .dash-desc { font-size: 11px; color: #666; margin-top: 5px; }
+    .dash-icon { font-size: 24px; margin-bottom: 10px; }
+    .dash-title { color: #fff; font-family: 'Outfit', sans-serif; font-size: 16px; text-transform: uppercase; margin: 0; line-height: 1.1; }
+    .dash-desc { font-size: 10px; color: #666; margin-top: auto; }
+    .dash-stat { font-size: 24px; font-weight: 800; color: #fff; margin-top: 5px; }
+
+    /* Estado "Próximamente" */
+    .coming-soon { opacity: 0.4; cursor: not-allowed; border-style: dashed; border-color: #333; }
     
-    /* Estado "Próximamente" para módulos no hechos */
-    .coming-soon { opacity: 0.5; cursor: not-allowed; border-style: dashed; }
-    .coming-soon::after {
-        content: 'PRÓXIMAMENTE'; position: absolute; top: 15px; right: 15px;
-        font-size: 9px; background: #222; color: #aaa; padding: 3px 6px; border-radius: 4px; font-weight: 700;
-    }
-
     /* Login Overlay */
     #login-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 9999; display: flex; flex-direction: column; align-items: center; justify-content: center; }
     .login-box { width: 300px; text-align: center; background: #111; padding: 30px; border: 1px solid #333; border-radius: 8px; }
@@ -78,89 +81,135 @@
       </div>
     </header>
 
-    <div class="admin-container" style="max-width: 1100px;">
+    <div class="admin-container" style="max-width: 1200px;">
       
       <div class="dashboard-section">
-        <div class="section-label">Web & Socios</div>
+        <div class="section-label lbl-web">CMS Web & Socios</div>
         <div class="dashboard-grid">
             <a href="admin-solicitudes.html" class="dash-card card-web">
                 <div class="dash-icon">👥</div>
-                <h3 class="dash-title">Solicitudes<br>de Ingreso</h3>
-                <div>
-                    <div id="count-pending" class="dash-stat" style="color:var(--mc-red)">--</div>
-                    <div class="dash-desc">Pendientes</div>
-                </div>
+                <h3 class="dash-title">Solicitudes</h3>
+                <div id="count-pending" class="dash-stat" style="color:var(--mc-red); font-size:20px;">--</div>
+                <div class="dash-desc">Admisión de Socios</div>
             </a>
             <a href="admin-accesos.html" class="dash-card card-web">
                 <div class="dash-icon">🎟️</div>
-                <h3 class="dash-title">Accesos<br>& Config</h3>
-                <div>
-                    <div id="count-active-tickets" class="dash-stat">--</div>
-                    <div class="dash-desc">Activos</div>
-                </div>
+                <h3 class="dash-title">Accesos Web</h3>
+                <div id="count-active-tickets" class="dash-stat" style="font-size:20px;">--</div>
+                <div class="dash-desc">Configuración Tickets</div>
             </a>
             <a href="admin-carta.html" class="dash-card card-web">
                 <div class="dash-icon">🍹</div>
-                <h3 class="dash-title">Carta<br>Digital</h3>
-                <div>
-                    <div id="count-menu" class="dash-stat">--</div>
-                    <div class="dash-desc">Items Visibles</div>
-                </div>
+                <h3 class="dash-title">Carta Pública</h3>
+                <div id="count-menu" class="dash-stat" style="font-size:20px;">--</div>
+                <div class="dash-desc">Precios Visibles</div>
             </a>
             <a href="admin-cumples.html" class="dash-card card-web">
                 <div class="dash-icon">🎂</div>
-                <h3 class="dash-title">Cumpleaños<br>Semana</h3>
-                <div>
-                    <div id="count-birthdays" class="dash-stat">--</div>
-                    <div class="dash-desc">Esta semana</div>
-                </div>
+                <h3 class="dash-title">Cumpleaños</h3>
+                <div id="count-birthdays" class="dash-stat" style="font-size:20px;">--</div>
+                <div class="dash-desc">Gestión Fidelización</div>
             </a>
         </div>
       </div>
 
-      <div id="sectionInternal" class="dashboard-section" style="display:none;">
-        <div class="section-label" style="color: var(--mc-accent-green);">Gestión Interna (Privado)</div>
-        <div class="dashboard-grid">
-            
-            <a href="admin-recetas.html" class="dash-card card-ops">
-                <div class="dash-icon">⚗️</div>
-                <h3 class="dash-title">Recetas<br>& SKUs</h3>
-                <div class="dash-desc">Ingeniería de Menú</div>
-            </a>
+      <div id="sectionERP" style="display:none;">
 
-            <a href="#" class="dash-card card-ops coming-soon">
-                <div class="dash-icon">🌜</div>
-                <h3 class="dash-title">Cierre<br>de Noche</h3>
-                <div class="dash-desc">Importar GBol + Caja</div>
-            </a>
-
-            <a href="#" class="dash-card card-ops coming-soon">
-                <div class="dash-icon">📦</div>
-                <h3 class="dash-title">Compras<br>& Proveedores</h3>
-                <div class="dash-desc">Ingreso de Facturas</div>
-            </a>
-
-            <a href="#" class="dash-card card-ops coming-soon">
-                <div class="dash-icon">👷</div>
-                <h3 class="dash-title">RRHH<br>& Dotación</h3>
-                <div class="dash-desc">Fichaje y Pagos</div>
-            </a>
-
+        <div class="dashboard-section">
+            <div class="section-label lbl-master">1. Master Data (Configuración)</div>
+            <div class="dashboard-grid">
+                <a href="admin-skus.html" class="dash-card card-master">
+                    <div class="dash-icon">🏗️</div>
+                    <h3 class="dash-title">Master SKUs</h3>
+                    <div class="dash-desc">Insumos & Sync GBol</div>
+                </a>
+                <a href="admin-recetas.html" class="dash-card card-master">
+                    <div class="dash-icon">⚗️</div>
+                    <h3 class="dash-title">Recetario</h3>
+                    <div class="dash-desc">Ingeniería de Menú</div>
+                </a>
+                <a href="#" class="dash-card card-master coming-soon">
+                    <div class="dash-icon">🚚</div>
+                    <h3 class="dash-title">Proveedores</h3>
+                    <div class="dash-desc">Directorio & Contactos</div>
+                </a>
+                <a href="#" class="dash-card card-master coming-soon">
+                    <div class="dash-icon">🔗</div>
+                    <h3 class="dash-title">Mapeo POS</h3>
+                    <div class="dash-desc">Conexión GBol/Zoco</div>
+                </a>
+                <a href="admin-logs.html" class="dash-card card-master">
+                    <div class="dash-icon">🛡️</div>
+                    <h3 class="dash-title">Logs Sistema</h3>
+                    <div class="dash-desc">Seguridad & Auditoría</div>
+                </a>
+            </div>
         </div>
-      </div>
 
-      <div class="dashboard-section">
-        <div class="section-label">Sistema</div>
-        <div class="dashboard-grid">
-            <a href="admin-logs.html" class="dash-card card-sys" id="cardLogs" style="display:none;">
-                <div class="dash-icon">🛡️</div>
-                <h3 class="dash-title">Auditoría<br>& Logs</h3>
-                <div class="dash-desc">Seguridad</div>
-            </a>
+        <div class="dashboard-section">
+            <div class="section-label lbl-daily">2. Operación Noche (Diario)</div>
+            <div class="dashboard-grid">
+                <a href="#" class="dash-card card-daily coming-soon">
+                    <div class="dash-icon">👷</div>
+                    <h3 class="dash-title">Check-in Staff</h3>
+                    <div class="dash-desc">Fichaje QR & Dotación</div>
+                </a>
+                <a href="#" class="dash-card card-daily coming-soon">
+                    <div class="dash-icon">📊</div>
+                    <h3 class="dash-title">Apertura/Cierre<br>Barras</h3>
+                    <div class="dash-desc">Control Stock Físico</div>
+                </a>
+                <a href="#" class="dash-card card-daily coming-soon">
+                    <div class="dash-icon">💵</div>
+                    <h3 class="dash-title">Rendición Caja</h3>
+                    <div class="dash-desc">Cierre Ciego vs Sistema</div>
+                </a>
+                <a href="#" class="dash-card card-daily coming-soon">
+                    <div class="dash-icon">📋</div>
+                    <h3 class="dash-title">Bitácora</h3>
+                    <div class="dash-desc">Novedades & Checklists</div>
+                </a>
+            </div>
         </div>
-      </div>
 
-    </div>
+        <div class="dashboard-section">
+            <div class="section-label lbl-weekly">3. Gestión Semanal</div>
+            <div class="dashboard-grid">
+                <a href="#" class="dash-card card-weekly coming-soon">
+                    <div class="dash-icon">📑</div>
+                    <h3 class="dash-title">Arqueo Semanal</h3>
+                    <div class="dash-desc">Balance & Impuestos</div>
+                </a>
+                <a href="#" class="dash-card card-weekly coming-soon">
+                    <div class="dash-icon">📦</div>
+                    <h3 class="dash-title">Compras</h3>
+                    <div class="dash-desc">Órdenes & Stock Depósito</div>
+                </a>
+                <a href="#" class="dash-card card-weekly coming-soon">
+                    <div class="dash-icon">💸</div>
+                    <h3 class="dash-title">Pagos</h3>
+                    <div class="dash-desc">Calendario & Deudas</div>
+                </a>
+            </div>
+        </div>
+
+        <div class="dashboard-section">
+            <div class="section-label lbl-monthly">4. Inteligencia Mensual</div>
+            <div class="dashboard-grid">
+                <a href="#" class="dash-card card-monthly coming-soon">
+                    <div class="dash-icon">📈</div>
+                    <h3 class="dash-title">Reporte Mensual</h3>
+                    <div class="dash-desc">P&L y Rentabilidad</div>
+                </a>
+                <a href="#" class="dash-card card-monthly coming-soon">
+                    <div class="dash-icon">🔭</div>
+                    <h3 class="dash-title">Proyección</h3>
+                    <div class="dash-desc">Presupuesto Mes Siguiente</div>
+                </a>
+            </div>
+        </div>
+
+      </div> </div>
   </div>
 
   <script>
@@ -188,11 +237,7 @@
         if (data) {
             localStorage.setItem('mc_admin_user', data.username);
             localStorage.setItem('mc_admin_role', data.role);
-            
-            await client.from('admin_logs').insert({ 
-                admin_name: data.username, action: 'LOGIN', details: `Rol: ${data.role}` 
-            });
-
+            await client.from('admin_logs').insert({ admin_name: data.username, action: 'LOGIN', details: `Rol: ${data.role}` });
             initSession(data.username, data.role);
         } else {
             btn.innerText = "INGRESAR";
@@ -208,13 +253,12 @@
         document.getElementById('main-content').style.display = 'block';
         document.getElementById('userDisplay').innerText = `${user} [${role.toUpperCase()}]`;
 
-        // SEGURIDAD: Mostrar módulos nuevos SOLO a Superadmin
+        // SEGURIDAD: Mostrar ERP Completo SOLO a Superadmin
+        // (Podrías agregar 'admin' si quieres que administración también vea)
         if (role === 'superadmin') {
-            document.getElementById('sectionInternal').style.display = 'block'; // Gestión Interna
-            document.getElementById('cardLogs').style.display = 'flex';       // Logs
+            document.getElementById('sectionERP').style.display = 'block';
         } else {
-            document.getElementById('sectionInternal').style.display = 'none';
-            document.getElementById('cardLogs').style.display = 'none';
+            document.getElementById('sectionERP').style.display = 'none';
         }
 
         loadDashboardCounts();
@@ -236,7 +280,6 @@
            const { count: menuCount } = await client.from('menu_items').select('*', { count: 'exact', head: true }).eq('is_active', true);
            document.getElementById('count-menu').textContent = menuCount || '0';
 
-           // Cumples
            const { data: members } = await client.from('members').select('nacimiento').eq('status', 'activo');
            if (members) {
                 const today = new Date();
