@@ -86,7 +86,7 @@
                     <div class="dash-icon">🔗</div><h3 class="dash-title">Mapeo POS</h3>
                     <div class="dash-desc">Conexión GBol/Zoco</div>
                 </a>
-                <a href="#" class="dash-card card-master coming-soon">
+                <a href="admin-proveedores.html" class="dash-card card-master">
                     <div class="dash-icon">🚚</div><h3 class="dash-title">Proveedores</h3><div class="dash-desc">Directorio</div>
                 </a>
                 <a href="admin-logs.html" class="dash-card card-master">
@@ -102,13 +102,13 @@
                     <div class="dash-icon">👷</div><h3 class="dash-title">RRHH & Dotación</h3>
                     <div class="dash-desc">Fichaje y Pagos</div>
                 </a>
-                <a href="#" class="dash-card card-daily coming-soon">
+                <a href="#" class="dash-card card-daily">
                     <div class="dash-icon">📊</div><h3 class="dash-title">Stock Barras</h3><div class="dash-desc">Aperturas y Conteos</div>
                 </a>
-                <a href="#" class="dash-card card-daily coming-soon">
+                <a href="admin-cierre.html" class="dash-card card-daily">
                     <div class="dash-icon">🌜</div><h3 class="dash-title">Cierre Noche</h3><div class="dash-desc">Cierre Ciego vs Sistema</div>
                 </a>
-                <a href="#" class="dash-card card-daily coming-soon">
+                <a href="#" class="dash-card card-daily">
                     <div class="dash-icon">📋</div><h3 class="dash-title">Bitácora</h3><div class="dash-desc">Novedades</div>
                 </a>
             </div>
@@ -117,13 +117,13 @@
         <div class="dashboard-section">
             <div class="section-label lbl-weekly">3. Gestión Semanal</div>
             <div class="dashboard-grid">
-                <a href="#" class="dash-card card-weekly coming-soon">
+                <a href="#" class="dash-card card-weekly">
                     <div class="dash-icon">📑</div><h3 class="dash-title">Arqueo Semanal</h3><div class="dash-desc">Balance</div>
                 </a>
                 <a href="admin-compras.html" class="dash-card card-weekly">
                     <div class="dash-icon">📦</div><h3 class="dash-title">Compras</h3><div class="dash-desc">Ingreso Facturas</div>
                 </a>
-                <a href="#" class="dash-card card-weekly coming-soon">
+                <a href="#" class="dash-card card-weekly">
                     <div class="dash-icon">💸</div><h3 class="dash-title">Pagos</h3><div class="dash-desc">Calendario</div>
                 </a>
             </div>
@@ -132,7 +132,7 @@
         <div class="dashboard-section">
             <div class="section-label lbl-monthly">4. Inteligencia Mensual</div>
             <div class="dashboard-grid">
-                <a href="#" class="dash-card card-monthly coming-soon">
+                <a href="#" class="dash-card card-monthly">
                     <div class="dash-icon">📈</div><h3 class="dash-title">Reporte P&L</h3><div class="dash-desc">Rentabilidad</div>
                 </a>
             </div>
@@ -182,9 +182,11 @@
             document.getElementById('sectionWeb').style.display = 'none';
             document.getElementById('sectionERP').style.display = 'none';
         } else if (role === 'superadmin') {
+            // AQUÍ ESTÁ LA CLAVE: Solo superadmin (Gerencia) ve el bloque ERP
             document.getElementById('sectionWeb').style.display = 'block';
             document.getElementById('sectionERP').style.display = 'block';
         } else {
+            // Admins, Managers, Operativos ven Web pero NO el ERP
             document.getElementById('sectionWeb').style.display = 'block';
             document.getElementById('sectionERP').style.display = 'none';
         }
@@ -201,7 +203,6 @@
             document.getElementById('count-active-tickets').textContent = tix || '0';
             const { count: menu } = await client.from('menu_items').select('*', {count:'exact',head:true}).eq('is_active',true);
             document.getElementById('count-menu').textContent = menu || '0';
-            // Cumples... (Lógica de semana abreviada para no saturar)
             document.getElementById('count-birthdays').textContent = '-'; 
         } catch(e){}
     }
