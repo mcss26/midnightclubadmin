@@ -6,6 +6,25 @@
   <link rel="stylesheet" href="admin-styles.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    /* CHIPS DE SELECCIÓN (Pago) */
+    .chip-container { display: flex; gap: 10px; margin-bottom: 15px; }
+    .chip-option {
+        flex: 1; background: #000; border: 1px solid #444; color: #888; 
+        padding: 12px; text-align: center; border-radius: 6px; cursor: pointer;
+        font-size: 11px; font-weight: 700; text-transform: uppercase; transition: all 0.2s;
+    }
+    .chip-option.selected {
+        background: rgba(205, 251, 62, 0.15); 
+        border-color: var(--mc-accent-green); 
+        color: var(--mc-accent-green);
+    }
+
+    /* Resto de estilos específicos */
+    .item-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+    .total-bar { background: #151515; padding: 20px; border-radius: 8px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+  </style>
 </head>
 <body>
   <header class="admin-header">
@@ -35,22 +54,20 @@
         <div class="modal-box" style="width:100%; max-width:600px; margin:0 auto; position:relative; box-shadow:none;">
             <h3 style="color:#fff; margin-top:0;">Registrar Factura</h3>
             <div style="margin-bottom:15px;">
-                <label style="font-size:10px; color:#888;">PROVEEDOR</label>
+                <label class="modal-label" style="font-size:10px; color:#888; display:block; margin-bottom:5px;">PROVEEDOR</label>
                 <select id="ordSupp" class="modal-select"></select>
             </div>
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px;">
-                <div><label style="font-size:10px; color:#888;">FECHA EMISIÓN</label><input type="date" id="ordDate" class="modal-input"></div>
-                <div><label style="font-size:10px; color:#888;">VENCIMIENTO</label><input type="date" id="ordDue" class="modal-input"></div>
+                <div><label style="font-size:10px; color:#888; display:block; margin-bottom:5px;">FECHA EMISIÓN</label><input type="date" id="ordDate" class="modal-input"></div>
+                <div><label style="font-size:10px; color:#888; display:block; margin-bottom:5px;">VENCIMIENTO</label><input type="date" id="ordDue" class="modal-input"></div>
             </div>
-            
             <div id="itemsCont"></div>
-            
             <button onclick="addItemRow()" style="width:100%; border:1px dashed #444; background:none; color:#888; padding:10px; cursor:pointer;">+ AGREGAR ÍTEM</button>
-            <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
+            <div class="total-bar">
                 <span style="font-size:12px; color:#888;">TOTAL</span>
-                <span id="ordTotal" style="font-size:24px; font-weight:900;">$0</span>
+                <span id="ordTotal" style="font-size:24px; font-weight:900; color:#fff;">$0</span>
             </div>
-            <button onclick="saveOrder()" class="btn-primary" style="width:100%; padding:15px; margin-top:20px; border-radius:6px;">CONFIRMAR INGRESO</button>
+            <button onclick="saveOrder()" class="btn-modal-save" style="width:100%; padding:15px; margin-top:20px;">CONFIRMAR INGRESO</button>
         </div>
     </div>
 
@@ -64,9 +81,21 @@
     <div class="modal-box">
         <h3>Proveedor</h3>
         <input type="hidden" id="sId">
-        <input type="text" id="sName" class="modal-input" placeholder="Nombre (Ej: Quilmes)">
-        <input type="text" id="sContact" class="modal-input" placeholder="Contacto">
-        <input type="text" id="sTerms" class="modal-input" placeholder="Condición Pago">
+        <input type="text" id="sName" class="modal-input" placeholder="Nombre Empresa">
+        <input type="text" id="sContact" class="modal-input" placeholder="Contacto (Tel/Email)">
+        
+        <div style="display:flex; gap:10px;">
+            <input type="text" id="sBank" class="modal-input" placeholder="Banco" style="flex:1;">
+            <input type="text" id="sCbu" class="modal-input" placeholder="CBU / Alias" style="flex:2;">
+        </div>
+
+        <label style="font-size:10px; color:#666; margin-bottom:5px; display:block;">CONDICIÓN DE PAGO</label>
+        <div class="chip-container">
+            <div class="chip-option selected" onclick="selectTerm('Contado', this)">CONTADO</div>
+            <div class="chip-option" onclick="selectTerm('Cta Corriente', this)">CTA CORRIENTE</div>
+        </div>
+        <input type="hidden" id="sTerms" value="Contado">
+
         <div class="modal-btns">
             <button onclick="closeModal()" class="btn-modal-cancel">CANCELAR</button>
             <button onclick="saveSupp()" class="btn-modal-save">GUARDAR</button>
@@ -92,7 +121,7 @@
             ]);
             supps = s.data||[]; skus = i.data||[];
             renderSupps(); 
-            addItemRow(); // Esto fallaba antes
+            addItemRow();
         } catch(e) { console.error(e); }
     };
 
@@ -106,21 +135,54 @@
     // --- PROVEEDORES ---
     function renderSupps() {
         const c = document.getElementById('suppList');
-        // Actualizar también el select de Nueva Compra
         const sel = document.getElementById('ordSupp');
         sel.innerHTML = '<option value="">Seleccionar...</option>' + supps.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
         
         if(!supps.length) { c.innerHTML = '<div class="empty-state">Sin datos. Agrega uno nuevo.</div>'; return; }
         c.innerHTML = supps.map(s => `
             <div class="data-card">
-                <div><div style="font-weight:700;">${s.name}</div><div style="font-size:11px; color:#666;">${s.contact_info||'-'}</div></div>
-                <button onclick="editS(${s.id})" style="border:1px solid #444; background:none; color:#fff; cursor:pointer;">✏️</button>
+                <div>
+                    <div class="card-title">${s.name}</div>
+                    <div class="card-sub" style="margin-bottom:4px;">📞 ${s.contact_info||'-'} • 💳 ${s.payment_terms||'Contado'}</div>
+                    ${s.cbu_alias ? `<div class="card-sub" style="color:#666; font-family:monospace; border:1px dashed #333; padding:4px; display:inline-block; border-radius:4px;">🏦 ${s.bank_name||''} : ${s.cbu_alias}</div>` : ''}
+                </div>
+                <button onclick="editS(${s.id})" style="border:1px solid #444; background:none; color:#fff; padding:8px; cursor:pointer;">✏️</button>
             </div>`).join('');
     }
     
-    function modalSupp(){ document.getElementById('sId').value=''; document.getElementById('sName').value=''; document.getElementById('sContact').value=''; document.getElementById('sTerms').value=''; document.getElementById('suppModal').style.display='flex'; }
+    function selectTerm(val, el) {
+        document.getElementById('sTerms').value = val;
+        document.querySelectorAll('.chip-option').forEach(c => c.classList.remove('selected'));
+        el.classList.add('selected');
+    }
+
+    function modalSupp(){ 
+        document.getElementById('sId').value=''; 
+        document.getElementById('sName').value=''; 
+        document.getElementById('sContact').value=''; 
+        document.getElementById('sBank').value=''; 
+        document.getElementById('sCbu').value=''; 
+        selectTerm('Contado', document.querySelectorAll('.chip-option')[0]);
+        document.getElementById('suppModal').style.display='flex'; 
+    }
+    
     function closeModal(){ document.getElementById('suppModal').style.display='none'; }
-    function editS(id){ const s = supps.find(x=>x.id===id); document.getElementById('sId').value=s.id; document.getElementById('sName').value=s.name; document.getElementById('sContact').value=s.contact_info; document.getElementById('sTerms').value=s.payment_terms; document.getElementById('suppModal').style.display='flex'; }
+    
+    function editS(id){ 
+        const s = supps.find(x=>x.id===id); 
+        document.getElementById('sId').value=s.id; 
+        document.getElementById('sName').value=s.name; 
+        document.getElementById('sContact').value=s.contact_info; 
+        document.getElementById('sBank').value=s.bank_name || ''; 
+        document.getElementById('sCbu').value=s.cbu_alias || ''; 
+        
+        // Seleccionar Chip correcto
+        const term = s.payment_terms === 'Cta Corriente' ? 'Cta Corriente' : 'Contado';
+        const idx = term === 'Contado' ? 0 : 1;
+        selectTerm(term, document.querySelectorAll('.chip-option')[idx]);
+        
+        document.getElementById('suppModal').style.display='flex'; 
+    }
     
     async function saveSupp(){
         const btn = document.querySelector('.btn-modal-save');
@@ -129,7 +191,9 @@
         const d = { 
             name: document.getElementById('sName').value, 
             contact_info: document.getElementById('sContact').value, 
-            payment_terms: document.getElementById('sTerms').value 
+            payment_terms: document.getElementById('sTerms').value,
+            bank_name: document.getElementById('sBank').value,
+            cbu_alias: document.getElementById('sCbu').value
         };
         const id = document.getElementById('sId').value;
 
@@ -146,22 +210,19 @@
 
     // --- NUEVA COMPRA ---
     window.addItemRow = () => {
-        const div = document.createElement('div'); 
-        div.style.cssText='display:flex; gap:10px; margin-bottom:10px; align-items:center;';
+        const div = document.createElement('div'); div.className='item-row';
         div.innerHTML = `
             <select class="modal-select sku-sel" onchange="fillCost(this)" style="flex:2; margin:0;"><option value="">Insumo...</option>${skus.map(s=>`<option value="${s.id}" data-c="${s.cost_price}">${s.name}</option>`).join('')}</select>
             <input type="number" class="modal-input qty" placeholder="Cant" oninput="calc()" style="width:70px; margin:0; text-align:center;">
-            <input type="number" class="modal-input cost" placeholder="$ Costo" oninput="calc()" style="width:90px; margin:0; text-align:right;">
+            <input type="number" class="modal-input cost" placeholder="$" oninput="calc()" style="width:90px; margin:0; text-align:right;">
             <button onclick="this.parentElement.remove(); calc()" style="background:none; border:none; color:#f55; cursor:pointer; font-weight:bold;">✕</button>
         `;
-        // Corrección: Usamos el ID correcto 'itemsCont'
         document.getElementById('itemsCont').appendChild(div);
     }
 
     window.fillCost = (s) => { 
         const opt = s.options[s.selectedIndex];
         const cost = opt.getAttribute('data-c');
-        // Solo llenar si tiene costo
         if(cost) s.parentElement.querySelector('.cost').value = cost; 
         calc(); 
     }
@@ -198,16 +259,14 @@
         
         if(error) return alert(error.message);
         
-        // Detalles
         await client.from('purchase_items').insert(items.map(i=>({...i, order_id:ord.id})));
         
-        // Actualizar Stock
+        // Update Stock
         for(const i of items) {
             const { data: sku } = await client.from('inventory_skus').select('stock_current').eq('id', i.sku_id).single();
             await client.from('inventory_skus').update({ stock_current: (sku.stock_current||0)+i.quantity_ordered, cost_price: i.unit_cost }).eq('id', i.sku_id);
         }
-        alert("Compra guardada y stock actualizado."); 
-        window.location.reload();
+        alert("Compra guardada."); window.location.reload();
     }
 
     async function loadHist() {
@@ -215,7 +274,10 @@
         document.getElementById('histList').innerHTML = data.map(o => `
             <div class="data-card">
                 <div><div class="card-title">${o.suppliers?.name}</div><div class="card-sub">${o.created_at.split('T')[0]}</div></div>
-                <div style="font-weight:700;">$${o.total_amount.toLocaleString()}</div>
+                <div style="text-align:right">
+                    <div style="font-weight:700; color:#fff;">$${o.total_amount.toLocaleString()}</div>
+                    <div style="font-size:9px; color:${o.payment_status==='paid'?'var(--mc-accent-green)':'var(--mc-red)'}">${o.payment_status?.toUpperCase() || 'IMPAGO'}</div>
+                </div>
             </div>`).join('');
     }
   </script>
