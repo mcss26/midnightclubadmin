@@ -1,126 +1,73 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Midnight Admin — Compras</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="admin-styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <style>
-    /* Tabs */
-    .tabs { display: flex; gap: 10px; margin-bottom: 20px; border-bottom: 1px solid #333; padding-bottom: 10px; }
-    .tab-btn { background: none; border: none; color: #666; font-family: 'Outfit'; font-size: 14px; cursor: pointer; padding: 10px; border-bottom: 2px solid transparent; }
-    .tab-btn.active { color: #fff; border-bottom-color: var(--mc-accent-green); font-weight: 700; }
-
-    /* Forms */
-    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
-    
-    /* Listas */
-    .data-list { display: flex; flex-direction: column; gap: 10px; }
-    .data-card { 
-        background: #111; border: 1px solid #333; padding: 15px; border-radius: 8px; 
-        display: flex; justify-content: space-between; align-items: center;
-    }
-    .card-title { color: #fff; font-weight: 700; margin-bottom: 5px; }
-    .card-sub { color: #666; font-size: 11px; }
-
-    /* Compra Items */
-    .item-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
-    .item-row input { background: #000; border: 1px solid #333; color: #fff; padding: 8px; border-radius: 4px; }
-    .sku-select { flex: 2; }
-    .qty-input { width: 70px; }
-    .cost-input { width: 90px; }
-    
-    .total-bar { 
-        background: #151515; padding: 15px; border-radius: 8px; margin-top: 20px; 
-        display: flex; justify-content: space-between; align-items: center; border: 1px solid #333;
-    }
-  </style>
 </head>
 <body>
-
   <header class="admin-header">
-    <div class="admin-logo">MIDNIGHT<span style="color: #FFD700;">FINANZAS</span> / COMPRAS</div>
-    <div style="display:flex; gap:15px; align-items:center;">
-        <span id="roleBadge" style="font-size:10px; border:1px solid #333; padding:4px 8px; border-radius:4px; color:#888;"></span>
+    <div class="admin-logo">MIDNIGHT<span style="color: #FFD700;">FINANZAS</span></div>
+    <div style="display:flex; gap:10px;">
+        <span id="roleBadge" style="font-size:10px; color:#888;"></span>
         <button onclick="window.location.href='index.html'" class="btn-logout">VOLVER</button>
     </div>
   </header>
 
   <div class="admin-container">
-    <main>
-        
-        <div class="tabs">
-            <button class="tab-btn active" onclick="switchTab('suppliers')">PROVEEDORES</button>
-            <button class="tab-btn" onclick="switchTab('orders')">NUEVA COMPRA</button>
-            <button class="tab-btn" onclick="switchTab('history')">HISTORIAL</button>
-        </div>
+    <div class="tabs">
+        <button class="tab-btn active" onclick="view('suppliers',this)">PROVEEDORES</button>
+        <button class="tab-btn" onclick="view('orders',this)">NUEVA COMPRA</button>
+        <button class="tab-btn" onclick="view('history',this)">HISTORIAL</button>
+    </div>
 
-        <div id="view-suppliers">
-            <div class="section-header">
-                <h2 class="section-title">Directorio</h2>
-                <button onclick="openSupplierModal()" class="btn-refresh" style="background:#fff; color:#000; font-weight:800;">+ NUEVO</button>
+    <div id="tab-suppliers">
+        <div class="section-header">
+            <h2 class="section-title">Directorio</h2>
+            <button onclick="modalSupp()" class="btn-refresh" style="background:#fff; color:#000;">+ NUEVO</button>
+        </div>
+        <div id="suppList" class="data-list"><div class="loading-state">Cargando...</div></div>
+    </div>
+
+    <div id="tab-orders" style="display:none;">
+        <div class="modal-box" style="width:100%; max-width:600px; margin:0 auto; position:relative; box-shadow:none;">
+            <h3 style="color:#fff; margin-top:0;">Registrar Factura</h3>
+            <div style="margin-bottom:15px;">
+                <label style="font-size:10px; color:#888;">PROVEEDOR</label>
+                <select id="ordSupp" class="modal-select"></select>
             </div>
-            <div id="supplierList" class="data-list">
-                <div class="loading-state">Cargando...</div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px;">
+                <div><label style="font-size:10px; color:#888;">FECHA EMISIÓN</label><input type="date" id="ordDate" class="modal-input"></div>
+                <div><label style="font-size:10px; color:#888;">VENCIMIENTO</label><input type="date" id="ordDue" class="modal-input"></div>
             </div>
-        </div>
-
-        <div id="view-orders" style="display:none;">
-            <div class="sidebar-card">
-                <h3 style="color:#fff; margin-top:0;">Registrar Factura / Remito</h3>
-                
-                <label class="input-label">Proveedor</label>
-                <select id="orderSupplier" class="modal-select" style="width:100%; margin-bottom:15px;"></select>
-
-                <div class="form-grid">
-                    <div>
-                        <label class="input-label">Fecha Emisión</label>
-                        <input type="date" id="orderDate" class="modal-input">
-                    </div>
-                    <div>
-                        <label class="input-label">Vencimiento Pago</label>
-                        <input type="date" id="orderDue" class="modal-input">
-                    </div>
-                </div>
-
-                <hr style="border:0; border-top:1px dashed #333; margin:20px 0;">
-                
-                <label class="input-label">Items (Insumos)</label>
-                <div id="orderItemsContainer"></div>
-                <button onclick="addOrderItemRow()" style="background:none; border:1px dashed #444; color:#888; width:100%; padding:10px; cursor:pointer; font-size:11px;">+ AGREGAR ÍTEM</button>
-
-                <div class="total-bar">
-                    <span style="color:#888; font-size:12px;">TOTAL FACTURA</span>
-                    <span id="orderTotal" style="color:#fff; font-size:20px; font-weight:900;">$ 0</span>
-                </div>
-
-                <button onclick="saveOrder()" class="btn-save" style="width:100%; margin-top:20px; background:var(--mc-accent-green); color:#000;">CONFIRMAR INGRESO</button>
+            <div id="itemsCont"></div>
+            <button onclick="addItemRow()" style="width:100%; border:1px dashed #444; background:none; color:#888; padding:10px; cursor:pointer;">+ AGREGAR ÍTEM</button>
+            <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:12px; color:#888;">TOTAL</span>
+                <span id="ordTotal" style="font-size:24px; font-weight:900;">$0</span>
             </div>
+            <button onclick="saveOrder()" class="btn-primary" style="width:100%; padding:15px; margin-top:20px; border-radius:6px;">CONFIRMAR INGRESO</button>
         </div>
+    </div>
 
-        <div id="view-history" style="display:none;">
-            <div class="section-header"><h2 class="section-title">Últimas Compras</h2></div>
-            <div id="historyList" class="data-list"></div>
-        </div>
-
-    </main>
+    <div id="tab-history" style="display:none;">
+        <div class="section-header"><h2 class="section-title">Historial</h2></div>
+        <div id="histList" class="data-list"></div>
+    </div>
   </div>
 
-  <div id="supplierModal" class="modal-overlay">
+  <div id="suppModal" class="modal-overlay">
     <div class="modal-box">
-        <h3 style="color:#fff; margin-top:0;">Nuevo Proveedor</h3>
-        <input type="hidden" id="suppId">
-        <input type="text" id="suppName" class="modal-input" placeholder="Nombre Empresa">
-        <input type="text" id="suppContact" class="modal-input" placeholder="Contacto / Teléfono">
-        <input type="text" id="suppTerms" class="modal-input" placeholder="Condición Pago (ej: 7 días)">
-        
+        <h3>Proveedor</h3>
+        <input type="hidden" id="sId">
+        <input type="text" id="sName" class="modal-input" placeholder="Nombre">
+        <input type="text" id="sContact" class="modal-input" placeholder="Contacto">
+        <input type="text" id="sTerms" class="modal-input" placeholder="Condición Pago">
         <div class="modal-btns">
-            <button onclick="closeModal('supplierModal')" class="btn-modal-cancel">CANCELAR</button>
-            <button onclick="saveSupplier()" class="btn-modal-save">GUARDAR</button>
+            <button onclick="closeModal()" class="btn-modal-cancel">CANCELAR</button>
+            <button onclick="saveSupp()" class="btn-modal-save">GUARDAR</button>
         </div>
     </div>
   </div>
@@ -129,206 +76,121 @@
     const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
     const user = localStorage.getItem('mc_admin_user');
     document.getElementById('roleBadge').innerText = user;
-    document.getElementById('orderDate').valueAsDate = new Date();
+    document.getElementById('ordDate').valueAsDate = new Date();
 
-    let skus = [];
-    let suppliers = [];
+    let skus=[], supps=[];
 
-    window.addEventListener('load', async () => {
-        await Promise.all([loadSuppliers(), loadSkus()]);
-    });
+    window.onload = async () => {
+        const [s, i] = await Promise.all([
+            client.from('suppliers').select('*').order('name'),
+            client.from('inventory_skus').select('id,name,cost_price').order('name')
+        ]);
+        supps = s.data||[]; skus = i.data||[];
+        renderSupps(); addItemRow();
+    };
 
-    function switchTab(tab) {
-        ['suppliers','orders','history'].forEach(t => document.getElementById('view-'+t).style.display = 'none');
-        document.getElementById('view-'+tab).style.display = 'block';
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        event.target.classList.add('active');
-        if(tab === 'history') loadHistory();
+    function view(v, btn) {
+        ['suppliers','orders','history'].forEach(x=>document.getElementById('tab-'+x).style.display='none');
+        document.getElementById('tab-'+v).style.display='block';
+        if(btn){ document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
+        if(v==='history') loadHist();
     }
 
-    // --- PROVEEDORES ---
-    async function loadSuppliers() {
-        const { data } = await client.from('suppliers').select('*').order('name');
-        suppliers = data || [];
-        renderSuppliers();
-        renderSupplierSelect();
-    }
-
-    function renderSuppliers() {
-        const container = document.getElementById('supplierList');
-        if(suppliers.length === 0) { container.innerHTML = '<div class="empty-state">Sin proveedores.</div>'; return; }
+    // Suppliers
+    function renderSupps() {
+        const c = document.getElementById('suppList');
+        const sel = document.getElementById('ordSupp');
+        sel.innerHTML = '<option value="">Seleccionar...</option>' + supps.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
         
-        container.innerHTML = suppliers.map(s => `
+        if(!supps.length) { c.innerHTML = '<div class="empty-state">Sin datos.</div>'; return; }
+        c.innerHTML = supps.map(s => `
             <div class="data-card">
-                <div>
-                    <div class="card-title">${s.name}</div>
-                    <div class="card-sub">${s.contact_info || '-'} | ${s.payment_terms || 'Contado'}</div>
-                </div>
-                <button onclick="editSupplier(${s.id})" class="btn-edit">✏️</button>
-            </div>
-        `).join('');
+                <div><div style="font-weight:700;">${s.name}</div><div style="font-size:11px; color:#666;">${s.contact_info}</div></div>
+                <button onclick="editS(${s.id})" style="border:1px solid #444; background:none; color:#fff; cursor:pointer;">✏️</button>
+            </div>`).join('');
+    }
+    
+    function modalSupp(){ document.getElementById('sId').value=''; document.getElementById('sName').value=''; document.getElementById('suppModal').style.display='flex'; }
+    function closeModal(){ document.getElementById('suppModal').style.display='none'; }
+    function editS(id){ const s = supps.find(x=>x.id===id); document.getElementById('sId').value=s.id; document.getElementById('sName').value=s.name; document.getElementById('sContact').value=s.contact_info; document.getElementById('sTerms').value=s.payment_terms; document.getElementById('suppModal').style.display='flex'; }
+    
+    async function saveSupp(){
+        const d = { name: document.getElementById('sName').value, contact_info: document.getElementById('sContact').value, payment_terms: document.getElementById('sTerms').value };
+        const id = document.getElementById('sId').value;
+        if(id) await client.from('suppliers').update(d).eq('id',id); else await client.from('suppliers').insert(d);
+        closeModal(); window.location.reload();
     }
 
-    function renderSupplierSelect() {
-        const sel = document.getElementById('orderSupplier');
-        sel.innerHTML = '<option value="">Seleccionar...</option>' + 
-            suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
-    }
-
-    async function saveSupplier() {
-        const id = document.getElementById('suppId').value;
-        const data = {
-            name: document.getElementById('suppName').value,
-            contact_info: document.getElementById('suppContact').value,
-            payment_terms: document.getElementById('suppTerms').value
-        };
-        if(!data.name) return;
-
-        if(id) await client.from('suppliers').update(data).eq('id', id);
-        else await client.from('suppliers').insert(data);
-        
-        closeModal('supplierModal');
-        loadSuppliers();
-    }
-
-    function editSupplier(id) {
-        const s = suppliers.find(x => x.id === id);
-        document.getElementById('suppId').value = s.id;
-        document.getElementById('suppName').value = s.name;
-        document.getElementById('suppContact').value = s.contact_info;
-        document.getElementById('suppTerms').value = s.payment_terms;
-        document.getElementById('supplierModal').style.display = 'flex';
-    }
-
-    function openSupplierModal() {
-        document.getElementById('suppId').value = '';
-        document.getElementById('suppName').value = '';
-        document.getElementById('suppContact').value = '';
-        document.getElementById('suppTerms').value = '';
-        document.getElementById('supplierModal').style.display = 'flex';
-    }
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-
-
-    // --- COMPRAS (Órdenes) ---
-    async function loadSkus() {
-        const { data } = await client.from('inventory_skus').select('id, name, cost_price').order('name');
-        skus = data || [];
-        addOrderItemRow(); // Agregar primera fila
-    }
-
-    function addOrderItemRow() {
-        const div = document.createElement('div');
-        div.className = 'item-row';
+    // Orders
+    window.addItemRow = () => {
+        const div = document.createElement('div'); div.className='item-row'; div.style.marginBottom='10px'; div.style.display='flex'; div.style.gap='10px';
         div.innerHTML = `
-            <select class="sku-select modal-select" onchange="autoFillCost(this)">
-                <option value="">Buscar Insumo...</option>
-                ${skus.map(s => `<option value="${s.id}" data-cost="${s.cost_price}">${s.name}</option>`).join('')}
-            </select>
-            <input type="number" class="qty-input" placeholder="Cant" oninput="calcTotal()">
-            <input type="number" class="cost-input" placeholder="$ Costo" oninput="calcTotal()">
-            <button onclick="this.parentElement.remove(); calcTotal();" style="color:var(--mc-red); background:none; border:none;">✕</button>
+            <select class="modal-select sku-sel" onchange="fillCost(this)" style="flex:2; margin:0;"><option value="">Insumo...</option>${skus.map(s=>`<option value="${s.id}" data-c="${s.cost_price}">${s.name}</option>`).join('')}</select>
+            <input type="number" class="modal-input qty" placeholder="Cant" oninput="calc()" style="width:70px; margin:0; text-align:center;">
+            <input type="number" class="modal-input cost" placeholder="$" oninput="calc()" style="width:90px; margin:0; text-align:right;">
+            <button onclick="this.parentElement.remove(); calc()" style="background:none; border:none; color:#f55; cursor:pointer;">✕</button>
+        `;
+        document.getElementById('itemsItemsContainer').appendChild(div); // Typo corrected in DOM ID
+    }
+    // Correction: ID in HTML was orderItemsContainer
+    window.addItemRow = () => {
+        const div = document.createElement('div'); div.style.cssText='display:flex; gap:10px; margin-bottom:10px;';
+        div.innerHTML = `
+            <select class="modal-select sku-sel" onchange="fillCost(this)" style="flex:2; margin:0;"><option value="">Insumo...</option>${skus.map(s=>`<option value="${s.id}" data-c="${s.cost_price}">${s.name}</option>`).join('')}</select>
+            <input type="number" class="modal-input qty" placeholder="Cant" oninput="calc()" style="width:70px; margin:0; text-align:center;">
+            <input type="number" class="modal-input cost" placeholder="$" oninput="calc()" style="width:90px; margin:0; text-align:right;">
+            <button onclick="this.parentElement.remove(); calc()" style="background:none; border:none; color:#f55; cursor:pointer;">✕</button>
         `;
         document.getElementById('orderItemsContainer').appendChild(div);
     }
 
-    window.autoFillCost = function(select) {
-        const cost = select.options[select.selectedIndex].getAttribute('data-cost');
-        const costInput = select.parentElement.querySelector('.cost-input');
-        if(costInput.value === '') costInput.value = cost;
-        calcTotal();
-    }
-
-    window.calcTotal = function() {
-        let total = 0;
-        document.querySelectorAll('.item-row').forEach(row => {
-            const qty = parseFloat(row.querySelector('.qty-input').value) || 0;
-            const cost = parseFloat(row.querySelector('.cost-input').value) || 0;
-            total += qty * cost;
+    window.fillCost = (s) => { s.parentElement.querySelector('.cost').value = s.options[s.selectedIndex].getAttribute('data-c'); calc(); }
+    
+    window.calc = () => {
+        let tot = 0;
+        document.querySelectorAll('#orderItemsContainer > div').forEach(r => {
+            tot += (parseFloat(r.querySelector('.qty').value)||0) * (parseFloat(r.querySelector('.cost').value)||0);
         });
-        document.getElementById('orderTotal').innerText = '$ ' + total.toLocaleString();
+        document.getElementById('orderTotal').innerText = '$'+tot.toLocaleString();
     }
 
     async function saveOrder() {
-        const supplierId = document.getElementById('orderSupplier').value;
-        const date = document.getElementById('orderDate').value;
-        const due = document.getElementById('orderDue').value;
-        
-        if(!supplierId) { alert("Selecciona proveedor"); return; }
-
+        const sup = document.getElementById('ordSupp').value;
+        if(!sup) return alert("Falta proveedor");
         const items = [];
-        document.querySelectorAll('.item-row').forEach(row => {
-            const skuId = row.querySelector('.sku-select').value;
-            const qty = parseFloat(row.querySelector('.qty-input').value);
-            const cost = parseFloat(row.querySelector('.cost-input').value);
-            if(skuId && qty > 0) items.push({ sku_id: skuId, quantity_ordered: qty, unit_cost: cost, total_line: qty*cost });
+        document.querySelectorAll('#orderItemsContainer > div').forEach(r => {
+            const s = r.querySelector('.sku-sel').value;
+            const q = parseFloat(r.querySelector('.qty').value);
+            const c = parseFloat(r.querySelector('.cost').value);
+            if(s && q) items.push({sku_id:s, quantity_ordered:q, unit_cost:c, total_line:q*c});
         });
-
-        if(items.length === 0) { alert("Agrega al menos un ítem"); return; }
-
-        const total = items.reduce((a,b) => a + b.total_line, 0);
-
-        // 1. Crear Orden
-        const { data: order, error } = await client.from('purchase_orders').insert({
-            supplier_id: supplierId,
-            created_at: date, // Usamos fecha emisión
-            due_date: due || date,
-            total_amount: total,
-            status: 'received' // Asumimos recibido para impactar stock
+        
+        const { data: ord, error } = await client.from('purchase_orders').insert({
+            supplier_id: sup, created_at: document.getElementById('ordDate').value, due_date: document.getElementById('ordDue').value,
+            total_amount: items.reduce((a,b)=>a+b.total_line,0), status: 'received'
         }).select().single();
-
-        if(error) { alert("Error: " + error.message); return; }
-
-        // 2. Insertar Items
-        const orderItems = items.map(i => ({ ...i, order_id: order.id }));
-        await client.from('purchase_items').insert(orderItems);
-
-        // 3. ACTUALIZAR STOCK Y COSTO (Impacto)
-        // Recorremos los items y actualizamos el maestro de SKUs
-        for (const item of items) {
-            // Nota: Aquí se podría hacer un RPC function en Supabase para ser atómico,
-            // pero lo haremos en JS por simplicidad ahora.
-            
-            // Buscar stock actual
-            const { data: sku } = await client.from('inventory_skus').select('stock_current').eq('id', item.sku_id).single();
-            const newStock = (sku.stock_current || 0) + item.quantity_ordered;
-            
-            // Update
-            await client.from('inventory_skus').update({
-                stock_current: newStock,
-                cost_price: item.unit_cost // Actualizamos al último precio de compra
-            }).eq('id', item.sku_id);
+        
+        if(error) return alert(error.message);
+        
+        await client.from('purchase_items').insert(items.map(i=>({...i, order_id:ord.id})));
+        
+        // Update Stock
+        for(const i of items) {
+            const { data: sku } = await client.from('inventory_skus').select('stock_current').eq('id', i.sku_id).single();
+            await client.from('inventory_skus').update({ stock_current: (sku.stock_current||0)+i.quantity_ordered, cost_price: i.unit_cost }).eq('id', i.sku_id);
         }
-
-        alert("Compra registrada. Stock actualizado.");
-        window.location.reload();
+        alert("Guardado"); window.location.reload();
     }
 
-    // --- HISTORIAL ---
-    async function loadHistory() {
-        const { data } = await client.from('purchase_orders')
-            .select('*, suppliers(name)')
-            .order('created_at', { ascending: false })
-            .limit(20);
-        
-        const container = document.getElementById('historyList');
-        if(!data || data.length===0) { container.innerHTML = '<div class="empty-state">Sin movimientos.</div>'; return; }
-
-        container.innerHTML = data.map(o => `
+    async function loadHist() {
+        const { data } = await client.from('purchase_orders').select('*, suppliers(name)').order('created_at',{ascending:false}).limit(20);
+        document.getElementById('histList').innerHTML = data.map(o => `
             <div class="data-card">
-                <div>
-                    <div class="card-title">${o.suppliers?.name}</div>
-                    <div class="card-sub">${new Date(o.created_at).toLocaleDateString()} • Vence: ${o.due_date || '-'}</div>
-                </div>
-                <div style="text-align:right">
-                    <div style="font-weight:700; color:#fff;">$${o.total_amount.toLocaleString()}</div>
-                    <div style="font-size:9px; color:${o.payment_status==='paid'?'var(--mc-accent-green)':'var(--mc-red)'}">${o.payment_status?.toUpperCase()}</div>
-                </div>
-            </div>
-        `).join('');
+                <div><div class="card-title">${o.suppliers?.name}</div><div class="card-sub">${o.created_at.split('T')[0]}</div></div>
+                <div style="font-weight:700;">$${o.total_amount.toLocaleString()}</div>
+            </div>`).join('');
     }
   </script>
 </body>

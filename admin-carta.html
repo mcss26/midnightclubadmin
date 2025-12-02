@@ -4,139 +4,66 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Midnight Admin — Carta</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="admin-styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    .menu-grid { display: grid; gap: 15px; }
-    .menu-item-card { background: #111; border: 1px solid #333; padding: 15px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
-    .item-left { display: flex; gap: 15px; align-items: center; }
-    .item-index { font-family: 'Outfit'; color: #444; font-size: 24px; font-weight: 900; width: 30px; text-align: right; }
-    .item-info h4 { margin: 0; color: #fff; font-size: 14px; text-transform: uppercase; }
-    .item-info p { margin: 4px 0 0; color: #888; font-size: 11px; }
-    .item-cat-badge { font-size: 9px; padding: 2px 6px; border-radius: 4px; background: #222; color: #aaa; text-transform: uppercase; margin-right: 5px; }
+    /* Estilos Modal y Listas */
+    .menu-item-card { background: #111; padding: 15px; border: 1px solid #333; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+    .item-actions { display: flex; align-items: center; gap: 10px; }
+    .price-input { width: 80px; background: #000; border: 1px solid #444; color: #fff; padding: 8px; text-align: right; border-radius: 4px; }
+    .filter-chips { display: flex; gap: 5px; margin-bottom: 20px; overflow-x: auto; }
+    .filter-chip { background: #111; color: #888; border: 1px solid #333; padding: 6px 12px; border-radius: 20px; cursor: pointer; font-size: 11px; text-transform: uppercase; }
+    .filter-chip.active { background: var(--mc-red); color: #fff; border-color: var(--mc-red); }
     
-    .item-actions { display: flex; align-items: center; gap: 15px; }
-    
-    /* Input Precio lista */
-    .price-input { background: #000; border: 1px solid #333; color: #fff; padding: 8px; width: 80px; text-align: right; font-family: monospace; font-weight: 700; border-radius: 4px; outline: none; }
-    .price-input:disabled { opacity: 0.5; cursor: not-allowed; border-color: transparent; }
-    
-    /* Visualizador Precio Cash (Pequeño) */
-    .cash-preview { font-size: 10px; color: var(--mc-accent-green); font-family: monospace; text-align: right; margin-top: 4px; display: block; font-weight: 700; }
-
-    .btn-edit { background: #333; color: #fff; border: none; padding: 8px; border-radius: 4px; cursor: pointer; }
-    .btn-create { background: var(--mc-red); color: #fff; border: none; padding: 10px 20px; font-weight: 800; border-radius: 4px; cursor: pointer; text-transform: uppercase; }
-    .btn-analytics { background: #111; border: 1px solid #333; color: #00eaff; padding: 10px 15px; font-weight: 700; border-radius: 4px; cursor: pointer; text-transform: uppercase; font-size: 11px; display: flex; align-items: center; gap: 5px; }
-    .btn-analytics:hover { border-color: #00eaff; background: rgba(0, 234, 255, 0.1); }
-
-    /* Modal Generico */
-    .modal-overlay { position: fixed; top:0; left:0; width:100%; height:100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); z-index: 200; display:none; justify-content:center; align-items:center; }
-    .modal-box { background: #111; border: 1px solid #444; padding: 30px; width: 90%; max-width: 450px; border-radius: 12px; max-height: 85vh; overflow-y: auto; }
-    .modal-input, .modal-select { width: 100%; background: #000; border: 1px solid #333; color: #fff; padding: 12px; margin-bottom: 15px; outline: none; }
-    .modal-btns { display: flex; gap: 10px; margin-top: 20px; }
-    .btn-modal-save { flex: 1; background: var(--mc-red); border: none; padding: 12px; color: #fff; font-weight: 800; cursor: pointer; }
-    .btn-modal-cancel { flex: 1; background: transparent; border: 1px solid #444; padding: 12px; color: #888; cursor: pointer; }
-
-    /* Analytics styles (Keep existing) */
-    .stats-row { display: flex; gap: 15px; margin-bottom: 20px; }
-    .stat-col { flex: 1; background: #000; padding: 15px; border-radius: 8px; border: 1px solid #222; }
-    .stat-title { color: #888; font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; border-bottom: 1px solid #333; padding-bottom: 5px; }
-    .stat-list { list-style: none; padding: 0; margin: 0; }
-    .stat-item { display: flex; justify-content: space-between; font-size: 12px; padding: 5px 0; border-bottom: 1px dashed #222; color: #ccc; }
-    .stat-count { font-weight: 700; color: #fff; }
-    .stat-zero { color: var(--mc-red); font-weight: 700; }
+    /* Modal */
+    .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); display: none; align-items: center; justify-content: center; z-index: 200; }
+    .modal-box { background: #111; padding: 30px; border-radius: 12px; border: 1px solid #333; width: 90%; max-width: 400px; }
   </style>
 </head>
 <body>
-
   <header class="admin-header">
-    <div class="admin-logo">MIDNIGHT<span style="color: var(--mc-red);">ADMIN</span> / CARTA</div>
-    <div style="display:flex; gap:15px; align-items:center;">
-        <span id="roleBadge" style="font-size:10px; border:1px solid #333; padding:4px 8px; border-radius:4px; color:#888;"></span>
-        <button onclick="window.location.href='index.html'" class="btn-logout">VOLVER</button>
-    </div>
+    <div class="admin-logo">MIDNIGHT<span style="color: var(--mc-red);">CARTA</span></div>
+    <button onclick="window.location.href='index.html'" class="btn-logout">VOLVER</button>
   </header>
 
   <div class="admin-container">
-    <main>
-        <div class="section-header">
-            <h2 class="section-title">Gestión de Productos</h2>
-            <div style="display:flex; gap:10px;">
-                <button onclick="openAnalytics()" class="btn-analytics">📊 Insights</button>
-                <button onclick="openModal()" class="btn-create" id="btnCreate"> + Nuevo</button>
-            </div>
-        </div>
+    <div class="section-header">
+        <h2 class="section-title">Productos</h2>
+        <button onclick="openModal()" class="btn-refresh" style="background:#fff; color:#000;">+ NUEVO</button>
+    </div>
 
-        <div class="filters-toolbar">
-            <button class="filter-chip active" onclick="filterList('all', this)">Todos</button>
-            <button class="filter-chip" onclick="filterList('vasos', this)">Tragos</button>
-            <button class="filter-chip" onclick="filterList('packs', this)">Packs</button>
-            <button class="filter-chip" onclick="filterList('baja', this)">Baja Grad.</button>
-            <button class="filter-chip" onclick="filterList('sin-alcohol', this)">Sin Alcohol</button>
-        </div>
+    <div class="filters-toolbar filter-chips">
+        <button class="filter-chip active" onclick="filter('all', this)">Todos</button>
+        <button class="filter-chip" onclick="filter('vasos', this)">Tragos</button>
+        <button class="filter-chip" onclick="filter('packs', this)">Packs</button>
+        <button class="filter-chip" onclick="filter('baja', this)">Baja</button>
+        <button class="filter-chip" onclick="filter('sin-alcohol', this)">Soft</button>
+    </div>
 
-        <div id="menu-list" class="menu-grid">
-            <div class="loading-state">Cargando carta...</div>
-        </div>
-    </main>
-  </div>
-
-  <div id="analyticsModal" class="modal-overlay">
-      <div class="modal-box" style="max-width: 600px;">
-          <h3 style="color:#fff; margin-top:0; font-family:'Outfit'; text-transform:uppercase;">Insights de Búsqueda</h3>
-          <p style="color:#666; font-size:11px; margin-bottom:20px;">Análisis de las últimas 500 búsquedas en la Carta Digital.</p>
-          <div class="stats-row">
-              <div class="stat-col">
-                  <div class="stat-title">Top Buscados (General)</div>
-                  <ul id="listTop" class="stat-list"><li style="text-align:center;">Cargando...</li></ul>
-              </div>
-              <div class="stat-col" style="border-color: rgba(232, 55, 47, 0.3);">
-                  <div class="stat-title" style="color: var(--mc-red);">Demandas Insatisfechas (0 Resultados)</div>
-                  <ul id="listMissed" class="stat-list"><li style="text-align:center;">Cargando...</li></ul>
-              </div>
-          </div>
-          <button onclick="document.getElementById('analyticsModal').style.display='none'" class="btn-modal-cancel" style="width:100%;">CERRAR</button>
-      </div>
+    <div id="menu-list"><div class="loading-state">Cargando...</div></div>
   </div>
 
   <div id="itemModal" class="modal-overlay">
     <div class="modal-box">
-        <h3 style="color:#fff; margin-top:0; font-family:'Outfit'; text-transform:uppercase;">Editar Item</h3>
+        <h3 style="color:#fff; margin-top:0;">Editar Item</h3>
         <input type="hidden" id="editId">
-        
-        <label style="color:#666; font-size:10px; text-transform:uppercase;">Nombre</label>
-        <input type="text" id="editName" class="modal-input" placeholder="Ej: Fernet Branca">
-        
-        <label style="color:#666; font-size:10px; text-transform:uppercase;">Descripción</label>
-        <input type="text" id="editDesc" class="modal-input" placeholder="Ej: + Coca Cola">
-
+        <input type="text" id="editName" class="modal-input" placeholder="Nombre">
+        <input type="text" id="editDesc" class="modal-input" placeholder="Descripción">
         <div style="display:flex; gap:10px;">
-            <div style="flex:1">
-                <label style="color:#666; font-size:10px; text-transform:uppercase;">Precio Lista (Tarjeta)</label>
-                <input type="number" id="editPrice" class="modal-input" placeholder="0" oninput="calcCashPreview()">
-                <div id="modalCashPreview" style="color:var(--mc-accent-green); font-size:11px; font-weight:700; text-align:right; margin-top:-10px; margin-bottom:15px;">Efectivo: $0</div>
-            </div>
-            <div style="flex:1">
-                <label style="color:#666; font-size:10px; text-transform:uppercase;">Categoría</label>
-                <select id="editCat" class="modal-select">
-                    <option value="vasos">Tragos (Vasos)</option>
-                    <option value="packs">Packs</option>
-                    <option value="baja">Baja Graduación</option>
-                    <option value="sin-alcohol">Sin Alcohol</option>
-                </select>
-            </div>
+            <input type="number" id="editPrice" class="modal-input" placeholder="Precio Lista">
+            <select id="editCat" class="modal-select">
+                <option value="vasos">Tragos</option>
+                <option value="packs">Packs</option>
+                <option value="baja">Baja</option>
+                <option value="sin-alcohol">Soft</option>
+            </select>
         </div>
-        
-        <label style="color:#666; font-size:10px; text-transform:uppercase;">Subcategoría</label>
-        <input type="text" id="editSub" class="modal-input" placeholder="Ej: Vodka, Gin...">
-
+        <input type="text" id="editSub" class="modal-input" placeholder="Subcategoría (ej: Vodka)">
         <div class="modal-btns">
-            <button onclick="closeModal()" class="btn-modal-cancel">CANCELAR</button>
+            <button onclick="document.getElementById('itemModal').style.display='none'" class="btn-modal-cancel">CANCELAR</button>
             <button onclick="saveItem()" class="btn-modal-save">GUARDAR</button>
         </div>
-        <button onclick="deleteItem()" id="btnDelete" style="width:100%; background:none; border:none; color:#444; font-size:10px; margin-top:15px; cursor:pointer; text-decoration:underline;">ELIMINAR ITEM</button>
+        <button onclick="deleteItem()" id="btnDelete" style="width:100%; margin-top:15px; background:none; border:none; color:#666; cursor:pointer;">ELIMINAR</button>
     </div>
   </div>
 
@@ -144,146 +71,64 @@
     const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    const role = localStorage.getItem('mc_admin_role') || 'invitado';
-    const user = localStorage.getItem('mc_admin_user') || 'Desconocido';
-    const canEdit = ['superadmin', 'admin', 'operativo'].includes(role);
-
+    
     let allItems = [];
     let currentCat = 'all';
 
-    window.addEventListener('load', () => {
-        document.getElementById('roleBadge').innerText = user + ' | ' + role.toUpperCase();
-        if(!canEdit) { document.getElementById('btnCreate').style.display = 'none'; }
-        loadItems();
-    });
+    window.onload = loadItems;
 
     async function loadItems() {
-        const { data, error } = await client.from('menu_items').select('*').order('id', { ascending: true });
-        if(error) { console.error(error); return; }
+        const { data } = await client.from('menu_items').select('*').order('name');
         allItems = data;
         renderItems();
     }
 
     function renderItems() {
+        const list = currentCat === 'all' ? allItems : allItems.filter(i => i.category === currentCat);
         const container = document.getElementById('menu-list');
-        const filtered = currentCat === 'all' ? allItems : allItems.filter(i => i.category === currentCat);
-        if(filtered.length === 0) { container.innerHTML = '<div class="empty-state">No hay items.</div>'; return; }
-
-        let html = '';
-        filtered.forEach((item, index) => {
-            const isActive = item.is_active;
-            const opacity = isActive ? '1' : '0.4';
-            const disabledAttr = canEdit ? '' : 'disabled';
-            const pointerStyle = canEdit ? '' : 'pointer-events:none; opacity:0.5;';
-            const editBtnDisplay = canEdit ? '' : 'display:none;';
-
-            // Calcular Efectivo (-25% redondeado a 100)
-            const cashPrice = Math.round((item.price * 0.75) / 100) * 100;
-
-            html += `
-            <div class="menu-item-card" style="opacity: ${opacity}">
-                <div class="item-left">
-                    <div class="item-index">${index + 1}</div>
-                    <div class="item-info">
-                        <h4><span class="item-cat-badge">${item.subcategory || item.category}</span> ${item.name}</h4>
-                        <p>${item.description || 'Sin descripción'}</p>
-                    </div>
+        container.innerHTML = list.map(i => `
+            <div class="menu-item-card" style="opacity:${i.is_active?1:0.5}">
+                <div>
+                    <div style="color:#fff; font-weight:700;">${i.name}</div>
+                    <div style="color:#666; font-size:10px;">${i.subcategory||'-'}</div>
                 </div>
                 <div class="item-actions">
-                    <label class="switch" style="${pointerStyle}" title="Stock">
-                        <input type="checkbox" ${isActive ? 'checked' : ''} ${disabledAttr} onchange="toggleStock(${item.id}, this.checked)">
-                        <span class="slider"></span>
-                    </label>
-                    
-                    <div style="display:flex; flex-direction:column; align-items:flex-end;">
-                        <input type="number" class="price-input" value="${item.price}" ${disabledAttr} onchange="updatePrice(${item.id}, this.value)">
-                        <span class="cash-preview">Efe: $${cashPrice}</span>
-                    </div>
-
-                    <button class="btn-edit" onclick="openModal(${item.id})" style="${editBtnDisplay}">✏️</button>
+                    <input type="checkbox" ${i.is_active?'checked':''} onchange="toggle(${i.id}, this.checked)">
+                    <input type="number" class="price-input" value="${i.price}" onchange="updatePrice(${i.id}, this.value)">
+                    <button onclick="edit(${i.id})" style="background:none; border:none; cursor:pointer;">✏️</button>
                 </div>
-            </div>`;
-        });
-        container.innerHTML = html;
-        if(!canEdit) document.querySelector('.section-title').innerHTML = 'Carta <span style="font-size:10px; border:1px solid #444; padding:2px 5px; color:#888;">MODO LECTURA</span>';
+            </div>
+        `).join('');
     }
 
-    function filterList(cat, btn) {
+    function filter(cat, btn) {
         currentCat = cat;
-        document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         renderItems();
     }
 
-    async function toggleStock(id, status) {
-        await client.from('menu_items').update({ is_active: status }).eq('id', id);
-        client.from('admin_logs').insert({ admin_name: user, action: 'STOCK', details: `Item ID ${id} -> ${status}` }).then();
-    }
-    async function updatePrice(id, newPrice) {
-        await client.from('menu_items').update({ price: newPrice }).eq('id', id);
-        client.from('admin_logs').insert({ admin_name: user, action: 'PRECIO', details: `Item ID ${id} -> $${newPrice}` }).then();
-        // Recargar para actualizar el cálculo de efectivo visualmente
-        setTimeout(loadItems, 500); 
-    }
+    async function toggle(id, val) { await client.from('menu_items').update({is_active:val}).eq('id',id); }
+    async function updatePrice(id, val) { await client.from('menu_items').update({price:val}).eq('id',id); }
 
-    // --- ANALYTICS (Igual que antes) ---
-    async function openAnalytics() {
-        document.getElementById('analyticsModal').style.display = 'flex';
-        const { data } = await client.from('analytics_searches').select('term, results_count').order('created_at', {ascending: false}).limit(500);
-        if(!data) return;
-        let counts = {}; let missed = {};
-        data.forEach(row => {
-            const term = row.term.toLowerCase();
-            counts[term] = (counts[term] || 0) + 1;
-            if(row.results_count === 0) missed[term] = (missed[term] || 0) + 1;
-        });
-        renderStatsList('listTop', counts, 10);
-        renderStatsList('listMissed', missed, 10, true);
+    function edit(id) {
+        const i = allItems.find(x => x.id === id);
+        document.getElementById('editId').value = i.id;
+        document.getElementById('editName').value = i.name;
+        document.getElementById('editDesc').value = i.description;
+        document.getElementById('editPrice').value = i.price;
+        document.getElementById('editCat').value = i.category;
+        document.getElementById('editSub').value = i.subcategory;
+        document.getElementById('btnDelete').style.display = 'block';
+        document.getElementById('itemModal').style.display = 'flex';
     }
-    function renderStatsList(elemId, dataObj, limit, isRed = false) {
-        const sorted = Object.entries(dataObj).sort((a,b) => b[1] - a[1]).slice(0, limit);
-        const ul = document.getElementById(elemId);
-        if(sorted.length === 0) { ul.innerHTML = '<li style="color:#666; text-align:center; padding:10px;">Sin datos aún</li>'; return; }
-        let html = '';
-        sorted.forEach(([term, count]) => {
-            const countClass = isRed ? 'stat-zero' : 'stat-count';
-            html += `<li class="stat-item"><span>${term}</span><span class="${countClass}">${count}</span></li>`;
-        });
-        ul.innerHTML = html;
-    }
-
-    // --- MODAL ITEM ---
-    const modal = document.getElementById('itemModal');
-    function openModal(id = null) {
-        modal.style.display = 'flex';
-        if(id) {
-            const item = allItems.find(i => i.id === id);
-            document.getElementById('editId').value = item.id;
-            document.getElementById('editName').value = item.name;
-            document.getElementById('editDesc').value = item.description || '';
-            document.getElementById('editPrice').value = item.price;
-            document.getElementById('editCat').value = item.category;
-            document.getElementById('editSub').value = item.subcategory || '';
-            document.getElementById('btnDelete').style.display = 'block';
-            calcCashPreview(); // Actualizar preview
-        } else {
-            document.getElementById('editId').value = '';
-            document.getElementById('editName').value = '';
-            document.getElementById('editDesc').value = '';
-            document.getElementById('editPrice').value = '';
-            document.getElementById('editSub').value = '';
-            document.getElementById('btnDelete').style.display = 'none';
-            document.getElementById('modalCashPreview').innerText = 'Efectivo: $0';
-        }
-    }
-    function closeModal() { modal.style.display = 'none'; }
-
-    // Calc en tiempo real dentro del modal
-    function calcCashPreview() {
-        const val = document.getElementById('editPrice').value;
-        const cash = Math.round((val * 0.75) / 100) * 100;
-        document.getElementById('modalCashPreview').innerText = `Efectivo: $${cash}`;
+    
+    function openModal() {
+        document.getElementById('editId').value = '';
+        document.getElementById('editName').value = '';
+        document.getElementById('editPrice').value = '';
+        document.getElementById('btnDelete').style.display = 'none';
+        document.getElementById('itemModal').style.display = 'flex';
     }
 
     async function saveItem() {
@@ -291,25 +136,22 @@
         const data = {
             name: document.getElementById('editName').value,
             description: document.getElementById('editDesc').value,
-            price: parseInt(document.getElementById('editPrice').value),
+            price: document.getElementById('editPrice').value,
             category: document.getElementById('editCat').value,
             subcategory: document.getElementById('editSub').value,
         };
-        if(id) {
-            await client.from('menu_items').update(data).eq('id', id);
-            client.from('admin_logs').insert({ admin_name: user, action: 'EDITAR_ITEM', details: data.name }).then();
-        } else {
-            await client.from('menu_items').insert(data);
-            client.from('admin_logs').insert({ admin_name: user, action: 'CREAR_ITEM', details: data.name }).then();
-        }
-        closeModal(); loadItems();
+        if(id) await client.from('menu_items').update(data).eq('id',id);
+        else await client.from('menu_items').insert(data);
+        document.getElementById('itemModal').style.display = 'none';
+        loadItems();
     }
+
     async function deleteItem() {
         const id = document.getElementById('editId').value;
         if(confirm("¿Eliminar?")) {
-            await client.from('menu_items').delete().eq('id', id);
-            client.from('admin_logs').insert({ admin_name: user, action: 'ELIMINAR_ITEM', details: `ID ${id}` }).then();
-            closeModal(); loadItems();
+            await client.from('menu_items').delete().eq('id',id);
+            document.getElementById('itemModal').style.display = 'none';
+            loadItems();
         }
     }
   </script>

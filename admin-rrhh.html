@@ -1,150 +1,59 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Midnight Admin — RRHH</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="admin-styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  
-  <style>
-    /* Layout */
-    .rrhh-grid { display: grid; grid-template-columns: 1fr; gap: 30px; }
-    @media(min-width: 900px) { .rrhh-grid { grid-template-columns: 350px 1fr; } }
-
-    /* Cards Empleados */
-    .staff-list { display: flex; flex-direction: column; gap: 10px; max-height: 70vh; overflow-y: auto; }
-    .staff-card { 
-        background: #111; border: 1px solid #333; padding: 15px; border-radius: 8px; 
-        display: flex; justify-content: space-between; align-items: center; cursor: pointer;
-    }
-    .staff-card:hover { border-color: #666; }
-    .staff-role { font-size: 10px; text-transform: uppercase; color: var(--mc-accent-green); border: 1px solid var(--mc-accent-green); padding: 2px 6px; border-radius: 4px; margin-left: 10px; }
-
-    /* Panel Evento */
-    .event-panel { background: var(--mc-card-bg); border: 1px solid var(--mc-border); padding: 25px; border-radius: 12px; }
-    
-    /* Tabla Operativa */
-    .ops-table { width: 100%; border-collapse: collapse; margin-top: 20px; font-size: 13px; }
-    .ops-table th { text-align: left; color: #666; border-bottom: 1px solid #333; padding: 10px; font-size: 10px; text-transform: uppercase; }
-    .ops-table td { border-bottom: 1px solid #222; padding: 10px; color: #fff; }
-    
-    .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
-    .st-pending { background: #666; }
-    .st-working { background: var(--mc-accent-green); box-shadow: 0 0 5px var(--mc-accent-green); }
-    .st-paid { background: #00eaff; }
-
-    /* Modal Firma */
-    canvas { background: #fff; border-radius: 4px; cursor: crosshair; touch-action: none; }
-  </style>
 </head>
 <body>
-
   <header class="admin-header">
     <div class="admin-logo">MIDNIGHT<span style="color: #d600ff;">RRHH</span></div>
-    <div style="display:flex; gap:15px; align-items:center;">
-        <span id="roleBadge" style="font-size:10px; border:1px solid #333; padding:4px 8px; border-radius:4px; color:#888;"></span>
+    <div style="display:flex; gap:10px;">
+        <span id="roleBadge" style="font-size:10px; color:#888; padding:5px;"></span>
         <button onclick="window.location.href='index.html'" class="btn-logout">VOLVER</button>
     </div>
   </header>
 
   <div class="admin-container">
-    <main class="rrhh-grid">
-        
+    <div class="rrhh-grid">
         <div>
-            <div class="section-header">
-                <h2 class="section-title">Directorio</h2>
-                <button onclick="openStaffModal()" class="btn-refresh" style="background:#fff; color:#000; font-weight:800;">+ ALTA</button>
-            </div>
-            <div id="staffList" class="staff-list">
-                <div class="loading-state">Cargando...</div>
-            </div>
+            <div class="section-header"><h2 class="section-title">Staff</h2><button onclick="modStaff()" class="btn-refresh" style="background:#fff; color:#000;">+ ALTA</button></div>
+            <div id="staffList" class="data-list"><div class="loading-state">Cargando...</div></div>
         </div>
-
-        <div class="event-panel">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <div>
-                    <label style="font-size:10px; color:#888; text-transform:uppercase;">EVENTO ACTIVO</label>
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <input type="date" id="eventDate" class="search-input-admin" style="width:auto;" onchange="loadEvent()">
-                        <span id="eventStatus" style="font-size:11px; color:var(--mc-accent-green); border:1px solid; padding:4px 8px; border-radius:4px;">PLANIFICADO</span>
-                    </div>
-                </div>
-                <div style="text-align:right;">
-                    <div style="font-size:10px; color:#888;">TOTAL NÓMINA</div>
-                    <div id="totalPayroll" style="font-size:24px; font-weight:900; color:#fff;">$ 0</div>
-                </div>
+        <div class="data-card" style="display:block; height:auto; cursor:default;">
+            <div style="display:flex; justify-content:space-between; margin-bottom:20px;">
+                <div><label class="card-sub">EVENTO</label><input type="date" id="evDate" class="modal-input" style="width:auto; padding:5px;" onchange="loadEv()"></div>
+                <div style="text-align:right;"><label class="card-sub">NÓMINA</label><div id="totPay" style="font-size:20px; font-weight:900;">$0</div></div>
             </div>
-
-            <h3 class="section-title" style="font-size:16px;">Dotación de la Noche</h3>
-            <div class="table-responsive">
-                <table class="ops-table">
-                    <thead>
-                        <tr>
-                            <th>Nombre</th>
-                            <th>Rol</th>
-                            <th>Pago Pactado</th>
-                            <th>Estado</th>
-                            <th>Acción</th>
-                        </tr>
-                    </thead>
-                    <tbody id="eventStaffList">
-                        <tr><td colspan="5" style="text-align:center; color:#666;">Selecciona gente del directorio para agregarlos a esta noche.</td></tr>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-    </main>
-  </div>
-
-  <div id="staffModal" class="modal-overlay">
-    <div class="modal-box">
-        <h3 style="color:#fff; margin-top:0;">Nuevo Empleado</h3>
-        <input type="text" id="newNames" class="modal-input" placeholder="Nombre Completo">
-        <input type="text" id="newDni" class="modal-input" placeholder="DNI">
-        <div style="display:flex; gap:10px;">
-            <select id="newRole" class="modal-select">
-                <option value="Bartender">Bartender</option>
-                <option value="Cajera">Cajera</option>
-                <option value="Seguridad">Seguridad</option>
-                <option value="Runner">Runner</option>
-                <option value="Encargado">Encargado</option>
-                <option value="Otro">Otro</option>
-            </select>
-            <input type="number" id="newBasePay" class="modal-input" placeholder="$ Base">
-        </div>
-        <div class="modal-btns">
-            <button onclick="closeModal('staffModal')" class="btn-modal-cancel">CANCELAR</button>
-            <button onclick="saveStaff()" class="btn-modal-save">GUARDAR</button>
+            <table class="ops-table"><tbody id="evList"></tbody></table>
         </div>
     </div>
   </div>
 
-  <div id="payModal" class="modal-overlay">
-    <div class="modal-box" style="width:100%; max-width:500px;">
-        <h3 style="color:#fff; margin-top:0;">Realizar Pago</h3>
-        <p id="payToName" style="color:#888; font-size:12px; margin-bottom:20px;">...</p>
-        
-        <label style="color:#666; font-size:10px;">MONTO A PAGAR</label>
-        <input type="number" id="payAmount" class="modal-input" style="font-size:24px; font-weight:900; color:var(--mc-accent-green);">
-        
-        <label style="color:#666; font-size:10px;">MÉTODO</label>
-        <select id="payMethod" class="modal-select">
-            <option value="cash">EFECTIVO (Caja)</option>
-            <option value="transfer">TRANSFERENCIA</option>
-        </select>
-
-        <label style="color:#666; font-size:10px; margin-top:10px; display:block;">FIRMA DEL EMPLEADO</label>
-        <canvas id="signaturePad" width="400" height="150" style="border:1px solid #444; margin-bottom:10px; width:100%;"></canvas>
-        <button onclick="clearSignature()" style="background:none; border:none; color:#666; font-size:10px; text-decoration:underline; cursor:pointer; width:100%; text-align:right;">Limpiar Firma</button>
-
-        <div class="modal-btns" style="margin-top:20px;">
-            <button onclick="closeModal('payModal')" class="btn-modal-cancel">CANCELAR</button>
-            <button onclick="processPayment()" class="btn-modal-save" style="background:#00eaff; color:#000;">CONFIRMAR PAGO</button>
+  <div id="staffModal" class="modal-overlay">
+    <div class="modal-box">
+        <h3>Empleado</h3>
+        <input type="text" id="nName" class="modal-input" placeholder="Nombre">
+        <input type="text" id="nDni" class="modal-input" placeholder="DNI">
+        <div style="display:flex; gap:10px;">
+            <select id="nRole" class="modal-select"><option>Bartender</option><option>Cajera</option><option>Seguridad</option><option>Runner</option></select>
+            <input type="number" id="nPay" class="modal-input" placeholder="$ Base">
         </div>
+        <div class="modal-btns"><button onclick="closeM()" class="btn-modal-cancel">CANCELAR</button><button onclick="saveS()" class="btn-modal-save">GUARDAR</button></div>
+    </div>
+  </div>
+
+  <div id="payModal" class="modal-overlay">
+    <div class="modal-box">
+        <h3>Pago</h3>
+        <p id="pName" class="card-sub">...</p>
+        <input type="number" id="pAmt" class="modal-input" style="font-size:24px; font-weight:900; color:#cdfb3e; text-align:center;">
+        <label class="card-sub">FIRMA DIGITAL</label>
+        <canvas id="sigPad" height="150" style="border:1px solid #444; width:100%; background:#fff;"></canvas>
+        <button onclick="clsSig()" style="background:none; border:none; color:#888; width:100%; text-align:right; cursor:pointer;">Limpiar</button>
+        <div class="modal-btns"><button onclick="closeM()" class="btn-modal-cancel">CANCELAR</button><button onclick="doPay()" class="btn-modal-save" style="background:#00eaff; color:#000;">CONFIRMAR</button></div>
     </div>
   </div>
 
@@ -152,239 +61,68 @@
     const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    // Init
     const user = localStorage.getItem('mc_admin_user');
     document.getElementById('roleBadge').innerText = user;
-    document.getElementById('eventDate').valueAsDate = new Date(); // Hoy
+    document.getElementById('evDate').valueAsDate = new Date();
 
-    let allStaff = [];
-    let currentEventId = null;
-    let paymentTargetId = null; // ID de event_staffing siendo pagado
+    let allS=[], curEv=null, payId=null;
+    const cvs = document.getElementById('sigPad'); const ctx = cvs.getContext('2d');
+    let draw=false;
+    ['mousedown','touchstart'].forEach(e=>cvs.addEventListener(e, (ev)=>{ draw=true; ctx.beginPath(); }));
+    ['mousemove','touchmove'].forEach(e=>cvs.addEventListener(e, (ev)=>{ if(!draw)return; const r=cvs.getBoundingClientRect(); const x=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left; const y=(ev.touches?ev.touches[0].clientY:ev.clientY)-r.top; ctx.lineTo(x,y); ctx.stroke(); ev.preventDefault(); }));
+    ['mouseup','touchend'].forEach(e=>cvs.addEventListener(e, ()=>{ draw=false; }));
+    function clsSig(){ ctx.clearRect(0,0,cvs.width,cvs.height); }
 
-    // CANVAS FIRMA
-    const canvas = document.getElementById('signaturePad');
-    const ctx = canvas.getContext('2d');
-    let drawing = false;
+    window.onload = () => { loadStaff(); loadEv(); };
 
-    // Eventos Canvas (Mouse + Touch)
-    ['mousedown', 'touchstart'].forEach(evt => canvas.addEventListener(evt, startDraw));
-    ['mousemove', 'touchmove'].forEach(evt => canvas.addEventListener(evt, draw));
-    ['mouseup', 'touchend'].forEach(evt => canvas.addEventListener(evt, endDraw));
-
-    function startDraw(e) { 
-        drawing = true; ctx.beginPath(); 
-        const {x, y} = getPos(e); ctx.moveTo(x, y); 
-        e.preventDefault();
+    async function loadStaff(){
+        const { data } = await client.from('staff_members').select('*, staff_roles(role_name,base_pay)').eq('status','active').order('full_name');
+        allS = data;
+        document.getElementById('staffList').innerHTML = data.map(s => `
+            <div class="data-card" onclick="add2Ev(${s.id}, ${s.default_role_id}, ${s.staff_roles?.base_pay||0})" style="cursor:pointer;">
+                <div><div style="font-weight:700;">${s.full_name}</div><div class="card-sub">${s.staff_roles?.role_name}</div></div>
+                <div style="font-weight:700;">+</div>
+            </div>`).join('');
     }
-    function draw(e) { 
-        if(!drawing) return; 
-        const {x, y} = getPos(e); 
-        ctx.lineTo(x, y); ctx.stroke(); 
-        e.preventDefault();
-    }
-    function endDraw() { drawing = false; }
-    function getPos(e) {
-        const rect = canvas.getBoundingClientRect();
-        const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-        const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-        return { x: clientX - rect.left, y: clientY - rect.top };
-    }
-    function clearSignature() { ctx.clearRect(0,0,canvas.width,canvas.height); }
 
-    window.addEventListener('load', () => {
-        loadStaff();
-        loadEvent();
-    });
-
-    // 1. CARGAR DIRECTORIO
-    async function loadStaff() {
-        const { data, error } = await client.from('staff_members')
-            .select('*, staff_roles(role_name, base_pay)')
-            .eq('status', 'active')
-            .order('full_name');
+    async function loadEv(){
+        const d = document.getElementById('evDate').value;
+        let { data: ev } = await client.from('events').select('*').eq('date', d).single();
+        if(!ev) { const { data: n } = await client.from('events').insert({date:d, name:'Noche '+d}).select().single(); ev=n; }
+        curEv = ev.id;
         
-        if(error) { console.error(error); return; }
-        allStaff = data;
-        renderStaffList();
+        const { data: st } = await client.from('event_staffing').select('*, staff_members(full_name), staff_roles(role_name)').eq('event_id', curEv);
+        let tot = 0;
+        document.getElementById('evList').innerHTML = st.length ? st.map(r => {
+            tot += parseFloat(r.agreed_pay);
+            const status = r.payment_status==='paid' ? '<span style="color:#00eaff;">PAGADO</span>' : `<button onclick="modPay(${r.id},'${r.staff_members.full_name}',${r.agreed_pay})" style="background:none; border:1px solid #cdfb3e; color:#cdfb3e; border-radius:4px; cursor:pointer;">PAGAR</button>`;
+            return `<tr><td>${r.staff_members.full_name}</td><td>$${r.agreed_pay}</td><td>${status}</td></tr>`;
+        }).join('') : '<tr><td colspan="3" style="text-align:center; color:#666;">Vacío</td></tr>';
+        document.getElementById('totPay').innerText = '$'+tot.toLocaleString();
     }
 
-    function renderStaffList() {
-        const container = document.getElementById('staffList');
-        container.innerHTML = '';
-        allStaff.forEach(s => {
-            const roleName = s.staff_roles ? s.staff_roles.role_name : 'Sin Rol';
-            const html = `
-            <div class="staff-card" onclick="addToEvent(${s.id}, ${s.default_role_id}, ${s.staff_roles?.base_pay || 0})">
-                <div>
-                    <div style="color:#fff; font-weight:700;">${s.full_name}</div>
-                    <div style="font-size:10px; color:#666;">DNI: ${s.dni || '-'}</div>
-                </div>
-                <div class="staff-role">${roleName}</div>
-            </div>`;
-            container.insertAdjacentHTML('beforeend', html);
-        });
+    async function add2Ev(sId, rId, pay){ await client.from('event_staffing').insert({event_id:curEv, staff_id:sId, assigned_role_id:rId, agreed_pay:pay}); loadEv(); }
+    
+    function modPay(id, name, amt){ payId=id; document.getElementById('pName').innerText=name; document.getElementById('pAmt').value=amt; clsSig(); document.getElementById('payModal').style.display='flex'; }
+    function modStaff(){ document.getElementById('staffModal').style.display='flex'; }
+    function closeM(){ document.querySelectorAll('.modal-overlay').forEach(m=>m.style.display='none'); }
+
+    async function saveS(){
+        const n = document.getElementById('nName').value;
+        const r = document.getElementById('nRole').value;
+        const p = document.getElementById('nPay').value;
+        let { data: role } = await client.from('staff_roles').select('id').eq('role_name', r).single();
+        if(!role) { const { data: nr } = await client.from('staff_roles').insert({role_name:r, base_pay:p}).select().single(); role=nr; }
+        await client.from('staff_members').insert({ full_name:n, dni:document.getElementById('nDni').value, default_role_id:role.id });
+        closeM(); loadStaff();
     }
 
-    // 2. CARGAR EVENTO
-    async function loadEvent() {
-        const date = document.getElementById('eventDate').value;
-        
-        // Buscar evento o crearlo si no existe
-        let { data: event, error } = await client.from('events').select('*').eq('date', date).single();
-        
-        if(!event) {
-            // Crear draft
-            const { data: newEvent } = await client.from('events').insert({ date: date, name: 'Noche ' + date }).select().single();
-            event = newEvent;
-        }
-        
-        currentEventId = event.id;
-        document.getElementById('eventStatus').innerText = event.status.toUpperCase();
-        loadEventStaffing();
+    async function doPay(){
+        const sig = cvs.toDataURL();
+        await client.from('event_staffing').update({ payment_status:'paid', agreed_pay:document.getElementById('pAmt').value, signature_url:sig }).eq('id', payId);
+        client.from('admin_logs').insert({ admin_name:user, action:'PAY', details:'ID '+payId });
+        closeM(); loadEv();
     }
-
-    async function loadEventStaffing() {
-        const { data } = await client.from('event_staffing')
-            .select('*, staff_members(full_name), staff_roles(role_name)')
-            .eq('event_id', currentEventId);
-        
-        const container = document.getElementById('eventStaffList');
-        container.innerHTML = '';
-        let total = 0;
-
-        if(!data || data.length === 0) {
-            container.innerHTML = '<tr><td colspan="5" style="text-align:center; padding:20px; color:#666;">Sin personal asignado.</td></tr>';
-        } else {
-            data.forEach(r => {
-                total += parseFloat(r.agreed_pay) || 0;
-                let statusHtml = '';
-                let actionHtml = '';
-
-                if(r.payment_status === 'paid') {
-                    statusHtml = '<span class="status-dot st-paid"></span> PAGADO';
-                    actionHtml = '<span style="color:#666; font-size:10px;">✔ OK</span>';
-                } else if(r.check_in_time) {
-                    statusHtml = '<span class="status-dot st-working"></span> TRABAJANDO';
-                    actionHtml = `<button onclick="openPayModal(${r.id}, '${r.staff_members.full_name}', ${r.agreed_pay})" class="btn-edit" style="color:#00eaff; border-color:#00eaff;">PAGAR</button>`;
-                } else {
-                    statusHtml = '<span class="status-dot st-pending"></span> CITADO';
-                    actionHtml = `<button onclick="doCheckIn(${r.id})" class="btn-edit" style="color:var(--mc-accent-green); border-color:var(--mc-accent-green);">CHECK-IN</button>`;
-                }
-
-                const html = `
-                <tr>
-                    <td style="font-weight:700;">${r.staff_members.full_name}</td>
-                    <td>${r.staff_roles?.role_name || '-'}</td>
-                    <td style="font-family:monospace;">$${r.agreed_pay}</td>
-                    <td style="font-size:10px;">${statusHtml}</td>
-                    <td>${actionHtml} <button onclick="removeFromEvent(${r.id})" style="background:none; border:none; color:#444; margin-left:10px; cursor:pointer;">✕</button></td>
-                </tr>`;
-                container.insertAdjacentHTML('beforeend', html);
-            });
-        }
-        document.getElementById('totalPayroll').innerText = '$ ' + total.toLocaleString();
-    }
-
-    // 3. ACCIONES
-    async function addToEvent(staffId, roleId, pay) {
-        if(!currentEventId) return;
-        // Evitar duplicados visualmente simple
-        await client.from('event_staffing').insert({
-            event_id: currentEventId,
-            staff_id: staffId,
-            assigned_role_id: roleId,
-            agreed_pay: pay
-        });
-        loadEventStaffing();
-    }
-
-    async function removeFromEvent(id) {
-        if(!confirm("¿Quitar de la lista?")) return;
-        await client.from('event_staffing').delete().eq('id', id);
-        loadEventStaffing();
-    }
-
-    async function doCheckIn(id) {
-        await client.from('event_staffing').update({ check_in_time: new Date() }).eq('id', id);
-        loadEventStaffing();
-    }
-
-    // 4. PAGOS & FIRMA
-    function openPayModal(id, name, amount) {
-        paymentTargetId = id;
-        document.getElementById('payToName').innerText = "Pagando a: " + name;
-        document.getElementById('payAmount').value = amount;
-        clearSignature();
-        document.getElementById('payModal').style.display = 'flex';
-    }
-
-    async function processPayment() {
-        const amount = document.getElementById('payAmount').value;
-        const method = document.getElementById('payMethod').value;
-        const signature = canvas.toDataURL(); // Base64 imagen
-
-        if(isCanvasBlank(canvas)) { alert("Falta la firma del empleado"); return; }
-
-        // Actualizar Pago
-        const { error } = await client.from('event_staffing').update({
-            payment_status: 'paid',
-            payment_method: method,
-            agreed_pay: amount, // Actualizar por si cambió el monto final
-            signature_url: signature // Guardamos la imagen base64 directo (o subir a storage en versión pro)
-        }).eq('id', paymentTargetId);
-
-        if(error) { alert("Error: " + error.message); } 
-        else {
-            closeModal('payModal');
-            loadEventStaffing();
-            // Log financiero
-            client.from('admin_logs').insert({ admin_name: user, action: 'PAGO_SUELDO', details: `Pago $${amount} a ID ${paymentTargetId}` }).then();
-        }
-    }
-
-    function isCanvasBlank(canvas) {
-        const blank = document.createElement('canvas');
-        blank.width = canvas.width; blank.height = canvas.height;
-        return canvas.toDataURL() === blank.toDataURL();
-    }
-
-    // 5. ABM STAFF (Simplificado)
-    async function saveStaff() {
-        const name = document.getElementById('newNames').value;
-        const dni = document.getElementById('newDni').value;
-        const roleName = document.getElementById('newRole').value;
-        const basePay = document.getElementById('newBasePay').value;
-
-        if(!name) return;
-
-        // 1. Crear o buscar rol (Simplificación: creamos si no existe, o usamos uno genérico)
-        // Para este MVP, vamos a asumir que creamos un rol al vuelo o buscamos uno.
-        // Mejor: Insertamos en staff_roles primero si es nuevo
-        let { data: role } = await client.from('staff_roles').select('id').eq('role_name', roleName).single();
-        
-        if(!role) {
-            const { data: newRole } = await client.from('staff_roles').insert({ role_name: roleName, base_pay: basePay }).select().single();
-            role = newRole;
-        }
-
-        // 2. Crear empleado
-        const { error } = await client.from('staff_members').insert({
-            full_name: name,
-            dni: dni,
-            default_role_id: role.id
-        });
-
-        if(error) alert("Error: " + error.message);
-        else {
-            closeModal('staffModal');
-            loadStaff();
-        }
-    }
-
-    function openStaffModal() { document.getElementById('staffModal').style.display = 'flex'; }
-    function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-
   </script>
 </body>
 </html>
