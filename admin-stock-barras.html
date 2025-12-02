@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Midnight Admin — Stock Barras</title>
+  <link rel="stylesheet" href="admin-styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .bar-toolbar { 
+        background: #111; padding: 15px; border-radius: 8px; border: 1px solid #333; 
+        display: flex; gap: 15px; align-items: flex-end; margin-bottom: 20px; flex-wrap: wrap;
+    }
+    .status-badge { 
+        padding: 5px 10px; border-radius: 4px; font-weight: 800; font-size: 11px; text-transform: uppercase; 
+        display: inline-block; margin-left: 10px;
+    }
+    .st-open { background: var(--mc-accent-green); color: #000; }
+    .st-closed { background: #333; color: #888; border: 1px solid #555; }
+    .st-none { background: transparent; border: 1px dashed #444; color: #666; }
+
+    .qty-input { 
+        background: #000; border: 1px solid #333; color: #fff; width: 60px; 
+        text-align: center; padding: 8px; border-radius: 4px; font-weight: 700;
+    }
+    .qty-input:focus { border-color: var(--mc-accent-blue); outline: none; }
+    .qty-ro { background: transparent; border: none; color: #666; font-family: monospace; width: 60px; text-align: center; }
+
+    .action-row { display: flex; justify-content: flex-end; margin-top: 20px; padding-top: 20px; border-top: 1px solid #333; }
+  </style>
+</head>
+<body>
+  <header class="admin-header">
+    <div class="admin-logo">MIDNIGHT<span style="color: var(--mc-accent-blue);">MOVIMIENTOS</span></div>
+    <button onclick="window.location.href='index.html'" class="btn-logout">VOLVER</button>
+  </header>
+
+  <div class="admin-container">
+    
+    <div class="bar-toolbar">
+        <div>
+            <label class="input-label">FECHA OPERACIÓN</label>
+            <input type="date" id="opDate" class="modal-input" style="width:auto; margin:0;" onchange="loadSession()">
+        </div>
+        <div style="flex-grow:1;">
+            <label class="input-label">SELECCIONAR BARRA</label>
+            <select id="barSelect" class="modal-select" onchange="loadSession()" style="margin:0;">
+                <option value="BARRA 1">BARRA 1 (Principal)</option>
+                <option value="BARRA 2">BARRA 2 (Patio)</option>
+                <option value="BARRA VIP">BARRA VIP</option>
+            </select>
+        </div>
+        <div style="text-align:right;">
+            <label class="input-label">ESTADO</label>
+            <div id="sessionStatus" class="status-badge st-none">PENDIENTE</div>
+        </div>
+    </div>
+
+    <div id="mainPanel" style="display:none;">
+        <div class="table-responsive">
+            <table class="sku-table">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th style="text-align:center; width:80px;">Inicio</th>
+                        <th style="text-align:center; width:80px;">Repos.</th>
+                        <th style="text-align:center; width:80px;">Final</th>
+                        <th style="text-align:center; width:80px;">Consumo</th>
+                    </tr>
+                </thead>
+                <tbody id="stockBody"></tbody>
+            </table>
+        </div>
+
+        <div class="action-row">
+            <button id="btnAction" class="btn-primary" onclick="saveSession()" style="padding:15px 30px; font-size:16px;">GUARDAR APERTURA</button>
+        </div>
+    </div>
+
+    <div id="emptyMsg" class="empty-state" style="margin-top:50px;">Selecciona fecha y barra para comenzar.</div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const user = localStorage.getItem('mc_admin_user');
+
+    document.getElementById('opDate').valueAsDate = new Date();
+    
+    let currentSession = null;
+    let products = [];
+    let itemsMap = {}; // sku_id -> { initial, added, final }
+
+    window.onload = loadSession;
+
+    async function loadSession() {
+        const date = document.getElementById('opDate').value;
+        const bar = document.getElementById('barSelect').value;
+        
+        document.getElementById('mainPanel').style.display = 'none';
+        document.getElementById('emptyMsg').innerText = 'Cargando...';
+        document.getElementById('emptyMsg').style.display = 'block';
+
+        // 1. Buscar si ya existe sesión
+        const { data: session } = await client.from('bar_sessions')
+            .select('*').eq('event_date', date).eq('bar_name', bar).maybeSingle();
+        
+        currentSession = session;
+        updateStatusUI(session);
+
+        // 2. Cargar productos (Filtrados por categorías de barra)
+        const cats = ['APERITIVO','VODKA','GIN','WHISKY','RON','CERVEZA','CHAMPAGNE','VINOS','SOFT','ENERGIZANTE'];
+        // Nota: Ajusta 'in' según tus categorías exactas de SKUs
+        const { data: skus } = await client.from('inventory_skus')
+            .select('id, name, category, stock_current')
+            .in('category', cats)
+            .order('category').order('name');
+        
+        products = skus || [];
+
+        // 3. Si hay sesión, cargar items previos
+        itemsMap = {};
+        if (session) {
+            const { data: items } = await client.from('bar_session_items').select('*').eq('session_id', session.id);
+            if(items) items.forEach(i => itemsMap[i.sku_id] = i);
+        }
+
+        renderTable();
+        document.getElementById('mainPanel').style.display = 'block';
+        document.getElementById('emptyMsg').style.display = 'none';
+    }
+
+    function updateStatusUI(s) {
+        const badge = document.getElementById('sessionStatus');
+        const btn = document.getElementById('btnAction');
+        
+        if (!s) {
+            badge.className = 'status-badge st-none'; badge.innerText = 'NO INICIADA';
+            btn.innerText = 'CONFIRMAR APERTURA (RESTAR DEPOSITO)';
+            btn.className = 'btn-primary';
+            btn.disabled = false;
+        } else if (s.status === 'open') {
+            badge.className = 'status-badge st-open'; badge.innerText = 'ABIERTA / OPERANDO';
+            btn.innerText = 'CERRAR BARRA (GUARDAR CONTEO)';
+            btn.className = 'btn-refresh'; // Estilo distinto para cierre
+            btn.style.background = 'var(--mc-red)';
+            btn.style.color = '#fff';
+            btn.disabled = false;
+        } else {
+            badge.className = 'status-badge st-closed'; badge.innerText = 'CERRADA';
+            btn.innerText = 'BARRA CERRADA';
+            btn.className = 'btn-refresh';
+            btn.disabled = true;
+        }
+    }
+
+    function renderTable() {
+        const tbody = document.getElementById('stockBody');
+        const isClosed = currentSession?.status === 'closed';
+        const isOpen = currentSession?.status === 'open';
+        
+        // Agrupar visualmente por categoría
+        let lastCat = '';
+        let html = '';
+
+        products.forEach(p => {
+            if(p.category !== lastCat) {
+                html += `<tr><td colspan="5" style="background:#222; font-size:10px; font-weight:800; color:#888; letter-spacing:1px; padding:5px 10px;">${p.category}</td></tr>`;
+                lastCat = p.category;
+            }
+
+            const prev = itemsMap[p.id] || { qty_initial:0, qty_added:0, qty_final:0 };
+            const sold = (parseFloat(prev.qty_initial)||0) + (parseFloat(prev.qty_added)||0) - (parseFloat(prev.qty_final)||0);
+
+            // Logica de inputs según estado
+            let inpInit, inpAdd, inpFinal;
+
+            if (!currentSession) {
+                // Modo Apertura: Solo Initial editable
+                inpInit = `<input type="number" class="qty-input" id="ini_${p.id}" value="${prev.qty_initial||0}">`;
+                inpAdd = `<span class="qty-ro">-</span>`;
+                inpFinal = `<span class="qty-ro">-</span>`;
+            } else if (isOpen) {
+                // Modo Abierto: Reposición y Final editables (Initial fijo)
+                inpInit = `<span class="qty-ro">${prev.qty_initial}</span>`;
+                inpAdd = `<input type="number" class="qty-input" id="add_${p.id}" value="${prev.qty_added||0}" style="border-color:#444;">`;
+                inpFinal = `<input type="number" class="qty-input" id="fin_${p.id}" value="${prev.qty_final||0}" style="border-color:var(--mc-accent-green);">`;
+            } else {
+                // Cerrado: Todo lectura
+                inpInit = `<span class="qty-ro">${prev.qty_initial}</span>`;
+                inpAdd = `<span class="qty-ro">${prev.qty_added}</span>`;
+                inpFinal = `<span class="qty-ro">${prev.qty_final}</span>`;
+            }
+
+            html += `
+            <tr>
+                <td>${p.name} <span style="font-size:9px; color:#444;">(Dep: ${p.stock_current})</span></td>
+                <td style="text-align:center;">${inpInit}</td>
+                <td style="text-align:center;">${inpAdd}</td>
+                <td style="text-align:center;">${inpFinal}</td>
+                <td style="text-align:center; font-weight:800; color:${isClosed?'#fff':'#666'}">${isClosed ? sold : '-'}</td>
+            </tr>`;
+        });
+        tbody.innerHTML = html;
+    }
+
+    async function saveSession() {
+        const date = document.getElementById('opDate').value;
+        const bar = document.getElementById('barSelect').value;
+        
+        if(!confirm("¿Confirmar operación de stock? Esto impactará en el depósito.")) return;
+
+        let sessionId = currentSession?.id;
+
+        // A. CREAR SESIÓN SI NO EXISTE
+        if (!currentSession) {
+            const { data: newS, error } = await client.from('bar_sessions')
+                .insert({ event_date: date, bar_name: bar, opened_by: user, status: 'open' })
+                .select().single();
+            if(error) return alert(error.message);
+            sessionId = newS.id;
+        }
+
+        const updates = [];
+        const movements = [];
+        
+        // B. RECORRER PRODUCTOS
+        for (const p of products) {
+            // Valores Inputs
+            const elIni = document.getElementById(`ini_${p.id}`);
+            const elAdd = document.getElementById(`add_${p.id}`);
+            const elFin = document.getElementById(`fin_${p.id}`);
+            
+            // Valores Previos
+            const old = itemsMap[p.id] || { qty_initial:0, qty_added:0 };
+
+            let valIni = elIni ? parseFloat(elIni.value)||0 : old.qty_initial;
+            let valAdd = elAdd ? parseFloat(elAdd.value)||0 : old.qty_added;
+            let valFin = elFin ? parseFloat(elFin.value)||0 : 0;
+
+            // Detectar Cambios para Movimientos (Solo restamos del deposito lo NUEVO)
+            const diffIni = valIni - old.qty_initial; // Si subió el inicial
+            const diffAdd = valAdd - old.qty_added;   // Si hubo reposición
+
+            const totalRestarDepo = diffIni + diffAdd;
+
+            if (totalRestarDepo !== 0) {
+                // Generar movimiento de egreso
+                movements.push({
+                    sku_id: p.id,
+                    change_amount: -totalRestarDepo, // Resta del depósito
+                    movement_type: currentSession ? 'REPOSICION' : 'APERTURA_BARRA',
+                    admin_name: user,
+                    notes: `${bar} - ${date}`
+                });
+                
+                // Actualizar stock master
+                await client.rpc('decrement_stock', { row_id: p.id, amount: totalRestarDepo }); 
+                // NOTA: Si no tienes una RPC function, usaremos update manual:
+                // await client.from('inventory_skus').update({stock_current: p.stock_current - totalRestarDepo}).eq('id',p.id);
+                // *Para simplificar en JS puro sin RPC:*
+                const {data:curr} = await client.from('inventory_skus').select('stock_current').eq('id',p.id).single();
+                await client.from('inventory_skus').update({stock_current: (curr.stock_current - totalRestarDepo)}).eq('id',p.id);
+            }
+
+            // Preparar objeto para bar_session_items
+            updates.push({
+                session_id: sessionId,
+                sku_id: p.id,
+                qty_initial: valIni,
+                qty_added: valAdd,
+                qty_final: valFin
+            });
+        }
+
+        // C. GUARDAR DETALLES
+        // Borramos previos de esta sesión y reinsertamos (más seguro para evitar conflictos)
+        await client.from('bar_session_items').delete().eq('session_id', sessionId);
+        await client.from('bar_session_items').insert(updates);
+
+        // D. GUARDAR MOVIMIENTOS
+        if(movements.length > 0) {
+            await client.from('inventory_movements').insert(movements);
+        }
+
+        // E. CERRAR SESIÓN SI CORRESPONDE
+        if (currentSession && currentSession.status === 'open') {
+            await client.from('bar_sessions').update({ status: 'closed', closed_by: user, closed_at: new Date() }).eq('id', sessionId);
+        }
+
+        alert("✅ Movimientos guardados exitosamente.");
+        loadSession();
+    }
+  </script>
+</body>
+</html>
