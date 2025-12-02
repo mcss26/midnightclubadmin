@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Midnight Admin — Arqueo Semanal</title>
+  <link rel="stylesheet" href="admin-styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    .calc-row { display: flex; justify-content: space-between; padding: 15px 0; border-bottom: 1px dashed #333; }
+    .calc-label { color: #888; font-size: 12px; text-transform: uppercase; }
+    .calc-val { color: #fff; font-family: monospace; font-size: 16px; font-weight: 700; }
+    
+    .final-row { 
+        background: #1a1a1a; padding: 20px; border-radius: 8px; margin-top: 20px; 
+        display: flex; justify-content: space-between; align-items: center; border: 1px solid #444;
+    }
+    .diff-val { font-size: 24px; font-weight: 900; }
+    .diff-ok { color: var(--mc-accent-green); }
+    .diff-bad { color: var(--mc-red); }
+  </style>
+</head>
+<body>
+  <header class="admin-header">
+    <div class="admin-logo">MIDNIGHT<span style="color: #fff;">SAFE</span></div>
+    <div style="display:flex; gap:10px;">
+        <span id="roleBadge" style="font-size:10px; color:#888; padding:5px;"></span>
+        <button onclick="window.location.href='index.html'" class="btn-logout">VOLVER</button>
+    </div>
+  </header>
+
+  <div class="admin-container" style="max-width: 500px;">
+    <div class="section-header"><h2 class="section-title">Arqueo Caja Fuerte</h2></div>
+
+    <div class="dash-card" style="height:auto; margin-bottom:20px;">
+        <h3 style="margin:0 0 20px 0; font-family:'Outfit';">Flujo Teórico</h3>
+        
+        <div class="calc-row">
+            <span class="calc-label">SALDO ANTERIOR (INICIO)</span>
+            <span class="calc-val" id="valStart">$ 0</span>
+        </div>
+        <div class="calc-row">
+            <span class="calc-label" style="color:var(--mc-accent-green);">+ INGRESOS (VENTAS NOCHE)</span>
+            <span class="calc-val" id="valIn" style="color:var(--mc-accent-green);">$ 0</span>
+        </div>
+        <div class="calc-row">
+            <span class="calc-label" style="color:var(--mc-red);">- EGRESOS (PAGOS EFECTIVO)</span>
+            <span class="calc-val" id="valOut" style="color:var(--mc-red);">$ 0</span>
+        </div>
+        
+        <div style="margin-top:20px; text-align:right;">
+            <div style="font-size:10px; color:#888;">DEBERÍA HABER</div>
+            <div id="valExpected" style="font-size:28px; font-weight:900; color:#fff;">$ 0</div>
+        </div>
+    </div>
+
+    <div class="dash-card" style="height:auto; border-color:#fff;">
+        <label class="input-label" style="color:#fff;">CONTEO FÍSICO (REAL)</label>
+        <input type="number" id="physicalInput" class="big-money-input" placeholder="$ 0" style="background:#000; border:1px solid #444; padding:15px; font-size:24px; width:100%; box-sizing:border-box; color:#fff; font-weight:700; text-align:center;" oninput="calcDiff()">
+        
+        <div class="final-row">
+            <span class="calc-label">DIFERENCIA</span>
+            <span id="valDiff" class="diff-val diff-ok">$ 0</span>
+        </div>
+
+        <textarea id="auditNotes" class="modal-input" placeholder="Observaciones..." style="margin-top:20px;"></textarea>
+        <button onclick="saveAudit()" class="btn-primary" style="width:100%; padding:15px; margin-top:10px;">CERRAR ARQUEO 🔒</button>
+    </div>
+
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const user = localStorage.getItem('mc_admin_user');
+    document.getElementById('roleBadge').innerText = user;
+
+    let calcData = { start:0, in:0, out:0, expected:0 };
+
+    window.onload = loadData;
+
+    async function loadData() {
+        // 1. Obtener último arqueo para saber desde cuándo calcular
+        const { data: lastAudit } = await client.from('safe_audits').select('*').order('created_at', {ascending:false}).limit(1).maybeSingle();
+        
+        const lastDate = lastAudit ? lastAudit.created_at : '2023-01-01';
+        calcData.start = lastAudit ? (parseFloat(lastAudit.physical_count) || 0) : 0; // El inicio de hoy es el final físico de ayer
+
+        // 2. Sumar INGRESOS (Cierres de Caja Posteriores al último arqueo)
+        // Buscamos en closing_terminals la suma de efectivo contado
+        const { data: incomes } = await client.from('closing_terminals')
+            .select('final_count_cash, cash_closings!inner(created_at)') // Join implícito
+            .gt('cash_closings.created_at', lastDate);
+        
+        calcData.in = incomes ? incomes.reduce((sum, item) => sum + (parseFloat(item.final_count_cash)||0), 0) : 0;
+
+        // 3. Sumar EGRESOS (Pagos en Efectivo Posteriores)
+        const { data: outcomes } = await client.from('purchase_orders')
+            .select('total_amount')
+            .eq('payment_method', 'EFECTIVO')
+            .eq('status', 'paid')
+            .gt('paid_at', lastDate); // Usar paid_at o created_at según lógica
+        
+        calcData.out = outcomes ? outcomes.reduce((sum, item) => sum + (parseFloat(item.total_amount)||0), 0) : 0;
+
+        // Render
+        calcData.expected = calcData.start + calcData.in - calcData.out;
+        
+        document.getElementById('valStart').innerText = '$ ' + calcData.start.toLocaleString();
+        document.getElementById('valIn').innerText = '$ ' + calcData.in.toLocaleString();
+        document.getElementById('valOut').innerText = '$ ' + calcData.out.toLocaleString();
+        document.getElementById('valExpected').innerText = '$ ' + calcData.expected.toLocaleString();
+        
+        calcDiff();
+    }
+
+    function calcDiff() {
+        const physical = parseFloat(document.getElementById('physicalInput').value) || 0;
+        const diff = physical - calcData.expected;
+        const el = document.getElementById('valDiff');
+        
+        el.innerText = '$ ' + diff.toLocaleString();
+        el.className = 'diff-val ' + (diff >= 0 ? 'diff-ok' : 'diff-bad');
+    }
+
+    async function saveAudit() {
+        const physical = parseFloat(document.getElementById('physicalInput').value);
+        if(isNaN(physical)) return alert("Ingresa el conteo físico.");
+
+        if(!confirm(`¿Confirmar Arqueo?\nFísico: $${physical}\nDiferencia: $${physical - calcData.expected}`)) return;
+
+        const { error } = await client.from('safe_audits').insert({
+            admin_name: user,
+            balance_start: calcData.start,
+            income_system: calcData.in,
+            outcome_system: calcData.out,
+            physical_count: physical,
+            notes: document.getElementById('auditNotes').value
+        });
+
+        if(error) alert(error.message);
+        else {
+            alert("✅ Arqueo guardado. La caja se reinicia con este saldo.");
+            window.location.reload();
+        }
+    }
+  </script>
+</body>
+</html>
