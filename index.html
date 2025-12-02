@@ -102,13 +102,13 @@
                     <div class="dash-icon">👷</div><h3 class="dash-title">RRHH & Dotación</h3>
                     <div class="dash-desc">Fichaje y Pagos</div>
                 </a>
-                <a href="admin-stock-barras.html" class="dash-card card-daily">
+                <a href="admin-stock-barras.html" id="btnStockBarras" class="dash-card card-daily">
                     <div class="dash-icon">📊</div><h3 class="dash-title">Stock Barras</h3><div class="dash-desc">Aperturas y Conteos</div>
                 </a>
                 <a href="admin-cierre.html" class="dash-card card-daily">
                     <div class="dash-icon">🌜</div><h3 class="dash-title">Cierre Noche</h3><div class="dash-desc">Cierre Ciego vs Sistema</div>
                 </a>
-                <a href="#" class="dash-card card-daily">
+                <a href="#" class="dash-card card-daily coming-soon">
                     <div class="dash-icon">📋</div><h3 class="dash-title">Bitácora</h3><div class="dash-desc">Novedades</div>
                 </a>
             </div>
@@ -117,13 +117,13 @@
         <div class="dashboard-section">
             <div class="section-label lbl-weekly">3. Gestión Semanal</div>
             <div class="dashboard-grid">
-                <a href="#" class="dash-card card-weekly">
+                <a href="#" class="dash-card card-weekly coming-soon">
                     <div class="dash-icon">📑</div><h3 class="dash-title">Arqueo Semanal</h3><div class="dash-desc">Balance</div>
                 </a>
                 <a href="admin-compras.html" class="dash-card card-weekly">
                     <div class="dash-icon">📦</div><h3 class="dash-title">Compras</h3><div class="dash-desc">Ingreso Facturas</div>
                 </a>
-                <a href="#" class="dash-card card-weekly">
+                <a href="#" class="dash-card card-weekly coming-soon">
                     <div class="dash-icon">💸</div><h3 class="dash-title">Pagos</h3><div class="dash-desc">Calendario</div>
                 </a>
             </div>
@@ -132,7 +132,7 @@
         <div class="dashboard-section">
             <div class="section-label lbl-monthly">4. Inteligencia Mensual</div>
             <div class="dashboard-grid">
-                <a href="#" class="dash-card card-monthly">
+                <a href="#" class="dash-card card-monthly coming-soon">
                     <div class="dash-icon">📈</div><h3 class="dash-title">Reporte P&L</h3><div class="dash-desc">Rentabilidad</div>
                 </a>
             </div>
@@ -177,34 +177,101 @@
         document.getElementById('main-content').style.display = 'block';
         document.getElementById('userDisplay').innerText = `${user} [${role.toUpperCase()}]`;
 
+        // Reset de visibilidad
+        document.getElementById('sectionStaff').style.display = 'none';
+        document.getElementById('sectionWeb').style.display = 'none';
+        document.getElementById('sectionERP').style.display = 'none';
+
         if (role === 'staff') {
             document.getElementById('sectionStaff').style.display = 'block';
-            document.getElementById('sectionWeb').style.display = 'none';
-            document.getElementById('sectionERP').style.display = 'none';
+
+        } else if (role === 'bar_manager') {
+            // VISTA JEFE DE BARRA (Solo Stock)
+            const erp = document.getElementById('sectionERP');
+            erp.style.display = 'block';
+            
+            // Ocultar todo dentro de ERP
+            erp.querySelectorAll('.dash-card').forEach(c => c.style.display = 'none');
+            erp.querySelectorAll('.section-label').forEach(l => l.style.display = 'none');
+            
+            // Mostrar solo botón Stock y un título temporal
+            const btn = document.getElementById('btnStockBarras');
+            if(btn) {
+                btn.style.display = 'flex';
+                btn.parentElement.style.display = 'grid'; // Grid container
+                
+                if(!document.getElementById('lbl-barra-temp')) {
+                    const t = document.createElement('div');
+                    t.id = 'lbl-barra-temp'; t.className = 'section-label'; t.innerText = 'OPERACIÓN DE BARRAS';
+                    btn.parentElement.parentElement.prepend(t);
+                }
+            }
+
         } else if (role === 'superadmin') {
-            // AQUÍ ESTÁ LA CLAVE: Solo superadmin (Gerencia) ve el bloque ERP
+            // VISTA GERENCIA (Ve TODO)
             document.getElementById('sectionWeb').style.display = 'block';
             document.getElementById('sectionERP').style.display = 'block';
+            document.getElementById('sectionStaff').style.display = 'block';
+            
+            // Restaurar visibilidad por si se ocultó antes
+            document.querySelectorAll('.dash-card').forEach(c => c.style.display = 'flex');
+            document.querySelectorAll('.section-label').forEach(l => l.style.display = 'block');
+            const tmp = document.getElementById('lbl-barra-temp'); if(tmp) tmp.remove();
+
         } else {
-            // Admins, Managers, Operativos ven Web pero NO el ERP
+            // VISTA ADMIN/MANAGER (Solo Web)
             document.getElementById('sectionWeb').style.display = 'block';
-            document.getElementById('sectionERP').style.display = 'none';
+            // ERP oculto por defecto para ellos
         }
-        if(role !== 'staff') loadCounts();
+
+        if(role !== 'staff' && role !== 'bar_manager') loadCounts();
     }
 
     function logout() { localStorage.clear(); window.location.reload(); }
 
     async function loadCounts() {
         try {
+            // 1. Solicitudes
             const { count: pend } = await client.from('members').select('*', {count:'exact',head:true}).eq('status','pendiente');
             document.getElementById('count-pending').textContent = pend || '0';
+            
+            // 2. Tickets
             const { count: tix } = await client.from('site_config').select('*', {count:'exact',head:true}).eq('is_active',true).or('key.eq.access_0000,key.eq.access_plus');
             document.getElementById('count-active-tickets').textContent = tix || '0';
+            
+            // 3. Carta
             const { count: menu } = await client.from('menu_items').select('*', {count:'exact',head:true}).eq('is_active',true);
             document.getElementById('count-menu').textContent = menu || '0';
-            document.getElementById('count-birthdays').textContent = '-'; 
-        } catch(e){}
+
+            // 4. Cumpleaños (Calculado)
+            const { data: members } = await client.from('members').select('nacimiento').eq('status','activo');
+            if (members) {
+                const today = new Date();
+                const currentDay = today.getDay();
+                const dayAdjusted = currentDay === 0 ? 7 : currentDay; 
+                const monday = new Date(today); monday.setDate(today.getDate() - (dayAdjusted - 1)); monday.setHours(0,0,0,0);
+                const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); sunday.setHours(23,59,59,999);
+                
+                let bdayCount = 0;
+                members.forEach(m => {
+                    if (!m.nacimiento || m.nacimiento.length < 5) return;
+                    let bMonth, bDay;
+                    // Parseo fecha (acepta DD-MM o YYYY-MM-DD o DD/MM)
+                    if (m.nacimiento.includes('-')) { 
+                        const p = m.nacimiento.split('-'); 
+                        if(p[0].length===4) { bMonth=parseInt(p[1])-1; bDay=parseInt(p[2]); } // YYYY-MM-DD
+                        else { bMonth=parseInt(p[1])-1; bDay=parseInt(p[0]); } // DD-MM
+                    } else if (m.nacimiento.includes('/')) { 
+                        const p = m.nacimiento.split('/'); 
+                        bMonth=parseInt(p[1])-1; bDay=parseInt(p[0]); 
+                    } else return;
+
+                    const bdayThisYear = new Date(today.getFullYear(), bMonth, bDay);
+                    if (bdayThisYear >= monday && bdayThisYear <= sunday) bdayCount++;
+                });
+                document.getElementById('count-birthdays').textContent = bdayCount;
+            }
+        } catch(e) { console.error(e); }
     }
   </script>
 </body>
