@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Midnight Admin — Cierre</title>
+  <link rel="stylesheet" href="admin-styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+
+  <style>
+    .closing-header { 
+        background: var(--mc-card-bg); padding: 20px; border-radius: 12px; border: 1px solid var(--mc-border); 
+        margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px;
+    }
+    
+    /* Tarjeta de Caja */
+    .terminal-card { 
+        background: #080808; border: 1px solid #333; border-radius: 8px; margin-bottom: 15px; overflow: hidden;
+    }
+    .term-header { 
+        padding: 15px; background: #151515; border-bottom: 1px solid #333; 
+        display: flex; justify-content: space-between; align-items: center;
+    }
+    .term-title { font-family: 'Outfit'; font-size: 16px; color: #fff; margin: 0; }
+    
+    .term-body { padding: 15px; display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 15px; }
+    
+    .input-group { display: flex; flex-direction: column; gap: 5px; }
+    .input-label { font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; }
+    .input-money { 
+        background: #000; border: 1px solid #333; color: #fff; padding: 10px; 
+        text-align: right; font-family: monospace; font-size: 14px; border-radius: 4px; outline: none;
+    }
+    .input-money:focus { border-color: var(--mc-accent-green); }
+    .input-money.system { border-color: transparent; color: #666; pointer-events: none; background: transparent; padding-right: 0; } 
+    .input-money.locked { pointer-events: none; opacity: 0.7; border-style: dashed; }
+
+    .term-footer { 
+        padding: 10px 15px; border-top: 1px solid #333; background: #111; 
+        display: flex; justify-content: flex-end; gap: 20px; 
+    }
+    .res-val { font-family: monospace; font-size: 16px; font-weight: 700; }
+    .res-val.ok { color: #666; }
+    .res-val.bad { color: var(--mc-red); }
+    .res-val.good { color: var(--mc-accent-green); }
+
+    /* Sección Globales */
+    .global-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+    .summary-card { background: #111; border: 1px solid #333; padding: 15px; border-radius: 8px; text-align: center; }
+    .sum-val { font-size: 24px; font-weight: 900; color: #fff; }
+  </style>
+</head>
+<body>
+
+  <header class="admin-header">
+    <div class="admin-logo">MIDNIGHT<span style="color: var(--mc-accent-green);">OPERATIVO</span></div>
+    <div style="display:flex; gap:10px;">
+        <span id="roleBadge" style="font-size:10px; color:#888; padding:5px;"></span>
+        <button onclick="window.location.href='index.html'" class="btn-logout">VOLVER</button>
+    </div>
+  </header>
+
+  <div class="admin-container">
+    
+    <div class="closing-header">
+        <div>
+            <label class="input-label">FECHA DE OPERACIÓN</label>
+            <input type="date" id="eventDate" class="search-input-admin" style="width:auto; margin:0;" onchange="loadClosing()">
+        </div>
+        <div style="display:flex; gap:10px;">
+            <input type="file" id="fileGbol" hidden accept=".xlsx,.xls" onchange="importGbol(this)">
+            <input type="file" id="fileZoco" hidden accept=".xlsx,.xls" onchange="importZoco(this)">
+            
+            <button onclick="document.getElementById('fileGbol').click()" class="btn-action">📥 GBOL</button>
+            <button onclick="document.getElementById('fileZoco').click()" class="btn-action">📥 ZOCO</button>
+            <button onclick="saveAll()" class="btn-primary" style="padding:10px 20px;">💾 GUARDAR CIERRE</button>
+        </div>
+    </div>
+
+    <div class="global-grid">
+        <div class="summary-card">
+            <span class="input-label">VENTA PASSLINE</span>
+            <input type="number" id="totalPassline" class="input-money" style="text-align:center; font-size:20px; width:100%;" value="0">
+        </div>
+        <div class="summary-card">
+            <span class="input-label">VENTA GUARDARROPA</span>
+            <input type="number" id="totalWardrobe" class="input-money" style="text-align:center; font-size:20px; width:100%;" value="0">
+        </div>
+        <div class="summary-card" style="border-color: var(--mc-red);">
+            <span class="input-label" style="color:var(--mc-red);">TOTAL NÓMINA (SUELDOS)</span>
+            <div id="totalStaffPay" class="sum-val" style="color:var(--mc-red);">$ 0</div>
+        </div>
+    </div>
+
+    <div id="terminalsContainer"><div class="loading-state">Selecciona fecha...</div></div>
+
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const user = localStorage.getItem('mc_admin_user');
+    document.getElementById('roleBadge').innerText = user;
+    document.getElementById('eventDate').valueAsDate = new Date();
+
+    let currentClosingId = null;
+    let terminals = {}; // { 'BARRA 1': { ...data } }
+    let posMapping = {}; 
+    let payrollTotal = 0;
+
+    window.onload = async () => {
+        await loadMapping();
+        loadClosing();
+    };
+
+    async function loadMapping() {
+        const { data } = await client.from('pos_terminals').select('*');
+        if(data) data.forEach(p => posMapping[`${p.provider}_${p.external_id}`] = p.friendly_name);
+    }
+
+    async function loadClosing() {
+        const date = document.getElementById('eventDate').value;
+        const container = document.getElementById('terminalsContainer');
+        container.innerHTML = '<div class="loading-state">Cargando datos...</div>';
+        
+        // 1. Buscar Cierre Existente
+        const { data: closing } = await client.from('cash_closings').select('*').eq('event_date', date).single();
+        
+        // 2. Buscar Sueldos Pagados en esa fecha (Desde RRHH)
+        // Asumimos que el evento tiene la misma fecha
+        // (Aquí una mejora futura sería vincular event_id directamente)
+        const { data: event } = await client.from('events').select('id').eq('date', date).single();
+        payrollTotal = 0;
+        if(event) {
+            const { data: pay } = await client.from('event_staffing').select('agreed_pay').eq('event_id', event.id).eq('payment_status', 'paid');
+            if(pay) payrollTotal = pay.reduce((sum, r) => sum + (parseFloat(r.agreed_pay)||0), 0);
+        }
+        document.getElementById('totalStaffPay').innerText = '$ ' + payrollTotal.toLocaleString();
+
+        terminals = {};
+        
+        // Inicializar con todas las cajas conocidas del mapeo
+        [...new Set(Object.values(posMapping))].forEach(name => {
+            terminals[name] = { 
+                terminal_name: name,
+                starting_cash: 0, system_cash: 0, cash_withdrawals: 0, staff_payments: 0, other_expenses: 0,
+                final_count_cash: 0, system_digital: 0, zoco_digital: 0
+            };
+        });
+
+        if (closing) {
+            currentClosingId = closing.id;
+            document.getElementById('totalPassline').value = closing.total_passline;
+            document.getElementById('totalWardrobe').value = closing.total_wardrobe;
+            
+            const { data: details } = await client.from('closing_terminals').select('*').eq('closing_id', closing.id);
+            if(details) details.forEach(d => terminals[d.terminal_name] = d);
+        } else {
+            currentClosingId = null;
+            document.getElementById('totalPassline').value = 0;
+            document.getElementById('totalWardrobe').value = 0;
+        }
+
+        renderTerminals();
+    }
+
+    function renderTerminals() {
+        const container = document.getElementById('terminalsContainer');
+        container.innerHTML = '';
+        
+        Object.keys(terminals).sort().forEach(key => {
+            const t = terminals[key];
+            
+            // MATEMÁTICA DE CAJA
+            // Saldo Teórico = Inicio + Venta Efectivo - Retiros - Pagos - Gastos
+            const teorico = (parseFloat(t.starting_cash)||0) + (parseFloat(t.system_cash)||0) - (parseFloat(t.cash_withdrawals)||0) - (parseFloat(t.staff_payments)||0) - (parseFloat(t.other_expenses)||0);
+            // Diferencia = Lo que contaron (Final) - Teórico
+            const diff = (parseFloat(t.final_count_cash)||0) - teorico;
+            
+            const diffClass = Math.abs(diff) < 500 ? 'ok' : (diff < 0 ? 'bad' : 'good');
+            
+            // Diferencia Digital (Zoco vs Sistema)
+            const diffDig = (parseFloat(t.zoco_digital)||0) - (parseFloat(t.system_digital)||0);
+            const diffDigClass = Math.abs(diffDig) < 500 ? 'ok' : (diffDig < 0 ? 'bad' : 'good');
+
+            const html = `
+            <div class="terminal-card">
+                <div class="term-header"><h3 class="term-title">${key}</h3></div>
+                <div class="term-body">
+                    
+                    <div class="input-group">
+                        <span class="input-label">1. APERTURA</span>
+                        <input type="number" class="input-money" value="${t.starting_cash||0}" onchange="upd('${key}','starting_cash',this.value)">
+                    </div>
+                    <div class="input-group">
+                        <span class="input-label">2. VENTA SISTEMA (EFVO)</span>
+                        <input type="number" class="input-money system" value="${t.system_cash||0}" readonly>
+                    </div>
+                    <div class="input-group">
+                        <span class="input-label" style="color:var(--mc-red);">3. RETIROS / PAGOS</span>
+                        <input type="number" class="input-money locked" value="${(t.cash_withdrawals||0) + (t.staff_payments||0) + (t.expenses||0)}" readonly title="Sumatoria de retiros cargados por cajera o admin">
+                    </div>
+                    <div class="input-group" style="border-left:1px solid #333; padding-left:15px;">
+                        <span class="input-label" style="color:#fff;">4. ARQUEO FÍSICO (BILLETES)</span>
+                        <input type="number" class="input-money" style="border-color:#fff;" value="${t.final_count_cash||0}" onchange="upd('${key}','final_count_cash',this.value)">
+                    </div>
+
+                    <div class="input-group" style="margin-left:20px;">
+                        <span class="input-label">ZOCO (LOTE)</span>
+                        <input type="number" class="input-money" value="${t.zoco_digital||0}" onchange="upd('${key}','zoco_digital',this.value)">
+                    </div>
+                    <div class="input-group">
+                        <span class="input-label">SISTEMA (TARJETA)</span>
+                        <input type="number" class="input-money system" value="${t.system_digital||0}" readonly>
+                    </div>
+
+                </div>
+                <div class="term-footer">
+                    <div><span class="input-label">DIF. EFECTIVO</span> <span class="res-val ${diffClass}">$${Math.round(diff)}</span></div>
+                    <div><span class="input-label">DIF. TARJETA</span> <span class="res-val ${diffDigClass}">$${Math.round(diffDig)}</span></div>
+                </div>
+            </div>`;
+            container.insertAdjacentHTML('beforeend', html);
+        });
+    }
+
+    function upd(key, field, val) {
+        terminals[key][field] = parseFloat(val) || 0;
+        renderTerminals();
+    }
+
+    // --- IMPORTAR GBOL ---
+    async function importGbol(input) {
+        // Lógica similar al POS Mapeo pero sumando valores
+        const file = input.files[0]; if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, {type:'array'});
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const raw = XLSX.utils.sheet_to_json(ws, {header:1});
+            // Buscar cabecera
+            let hIdx = raw.findIndex(r => JSON.stringify(r).toLowerCase().includes('ptovta'));
+            if(hIdx===-1) return alert("Formato GBol no válido");
+            
+            const rows = XLSX.utils.sheet_to_json(ws, {range:hIdx});
+            
+            // Reset de valores de sistema
+            Object.keys(terminals).forEach(k => { terminals[k].system_cash = 0; terminals[k].system_digital = 0; });
+
+            rows.forEach(r => {
+                const pid = r['ptovta']||r['Pto. Vta.'];
+                const imp = parseFloat(r['importe']||r['Importe']||0);
+                const efec = parseFloat(r['efectivo']||r['Efectivo']||0);
+                const dig = imp - efec;
+
+                const realName = posMapping[`GBOL_${pid}`];
+                if(realName && terminals[realName]) {
+                    terminals[realName].system_cash += efec;
+                    terminals[realName].system_digital += dig;
+                }
+            });
+            alert("Ventas GBol Importadas.");
+            renderTerminals();
+            input.value = '';
+        }
+        reader.readAsArrayBuffer(file);
+    }
+
+    // --- IMPORTAR ZOCO (Simplificado) ---
+    async function importZoco(input) {
+        // Asumimos que el reporte Zoco trae una columna "TERMINAL" y "NETO" o "BRUTO"
+        const file = input.files[0]; if(!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const data = new Uint8Array(e.target.result);
+            const wb = XLSX.read(data, {type:'array'});
+            const ws = wb.Sheets[wb.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(ws);
+
+            Object.keys(terminals).forEach(k => terminals[k].zoco_digital = 0);
+
+            rows.forEach(r => {
+                const tid = r['TERMINAL'] || r['Terminal ID'] || '';
+                const monto = parseFloat(r['TOTAL_OP'] || r['BRUTO'] || 0); // Usamos bruto para comparar con sistema
+                
+                // Limpieza de ID Zoco (a veces viene con ceros o texto)
+                const cleanTid = String(tid).replace(/\D/g,''); 
+                
+                const realName = posMapping[`ZOCO_${cleanTid}`];
+                if(realName && terminals[realName]) {
+                    terminals[realName].zoco_digital += monto;
+                }
+            });
+            alert("Lotes Zoco Importados.");
+            renderTerminals();
+            input.value = '';
+        }
+        reader.readAsArrayBuffer(file);
+    }
+
+    async function saveAll() {
+        const date = document.getElementById('eventDate').value;
+        const pass = document.getElementById('totalPassline').value;
+        const ward = document.getElementById('totalWardrobe').value;
+
+        // Upsert Cabecera
+        const { data: head, error } = await client.from('cash_closings')
+            .upsert({ event_date: date, total_passline: pass, total_wardrobe: ward, status: 'closed' }, { onConflict: 'event_date' })
+            .select().single();
+            
+        if(error) return alert(error.message);
+
+        // Insertar Detalles (Borrar y crear para evitar lío de updates)
+        await client.from('closing_terminals').delete().eq('closing_id', head.id);
+        
+        const details = Object.values(terminals).map(t => ({
+            closing_id: head.id,
+            terminal_name: t.terminal_name,
+            starting_cash: t.starting_cash,
+            system_cash: t.system_cash,
+            cash_withdrawals: t.cash_withdrawals,
+            staff_payments: t.staff_payments,
+            other_expenses: t.other_expenses,
+            final_count_cash: t.final_count_cash,
+            system_digital: t.system_digital,
+            zoco_digital: t.zoco_digital
+        }));
+        
+        await client.from('closing_terminals').insert(details);
+        alert("Cierre Guardado Exitosamente.");
+    }
+  </script>
+</body>
+</html>
