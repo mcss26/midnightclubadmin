@@ -6,100 +6,65 @@
   <link rel="stylesheet" href="admin-styles.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <style>
-    /* CHIPS DE SELECCIÓN (Pago) */
-    .chip-container { display: flex; gap: 10px; margin-bottom: 15px; }
-    .chip-option {
-        flex: 1; background: #000; border: 1px solid #444; color: #888; 
-        padding: 12px; text-align: center; border-radius: 6px; cursor: pointer;
-        font-size: 11px; font-weight: 700; text-transform: uppercase; transition: all 0.2s;
-    }
-    .chip-option.selected {
-        background: rgba(205, 251, 62, 0.15); 
-        border-color: var(--mc-accent-green); 
-        color: var(--mc-accent-green);
-    }
-
-    /* Resto de estilos específicos */
-    .item-row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
-    .total-bar { background: #151515; padding: 20px; border-radius: 8px; margin-top: 20px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+    /* Estilos Específicos */
+    .tabs { display: flex; gap: 20px; margin-bottom: 20px; border-bottom: 1px solid #333; }
+    .tab-btn { background:none; border:none; color:#666; padding:15px 5px; cursor:pointer; font-family:'Outfit'; font-size:14px; border-bottom:2px solid transparent; }
+    .tab-btn.active { color:#fff; border-color:var(--mc-accent-green); font-weight:700; }
+    
+    .card-form { background:#111; border:1px solid #333; padding:25px; border-radius:12px; max-width:600px; }
+    .item-row { display:flex; gap:10px; margin-bottom:10px; align-items:center; }
+    .sku-select { flex:2; background:#000; border:1px solid #333; color:#fff; padding:10px; border-radius:4px; }
+    .qty, .cost { width:80px; background:#000; border:1px solid #333; color:#fff; padding:10px; text-align:right; border-radius:4px; }
   </style>
 </head>
 <body>
   <header class="admin-header">
-    <div class="admin-logo">MIDNIGHT<span style="color: #FFD700;">FINANZAS</span></div>
+    <div class="admin-logo">MIDNIGHT<span style="color: #FFD700;">FINANZAS</span> / COMPRAS</div>
     <div style="display:flex; gap:10px;">
-        <span id="roleBadge" style="font-size:10px; color:#888;"></span>
+        <span id="roleBadge" style="font-size:10px; color:#888; padding:5px;"></span>
         <button onclick="window.location.href='index.html'" class="btn-logout">VOLVER</button>
     </div>
   </header>
 
   <div class="admin-container">
     <div class="tabs">
-        <button class="tab-btn active" onclick="view('suppliers',this)">PROVEEDORES</button>
-        <button class="tab-btn" onclick="view('orders',this)">NUEVA COMPRA</button>
-        <button class="tab-btn" onclick="view('history',this)">HISTORIAL</button>
+        <button class="tab-btn active" onclick="switchTab('new', this)">NUEVA COMPRA / GASTO</button>
+        <button class="tab-btn" onclick="switchTab('hist', this)">HISTORIAL</button>
     </div>
 
-    <div id="tab-suppliers">
-        <div class="section-header">
-            <h2 class="section-title">Directorio</h2>
-            <button onclick="modalSupp()" class="btn-refresh" style="background:#fff; color:#000;">+ NUEVO</button>
-        </div>
-        <div id="suppList" class="data-list"><div class="loading-state">Cargando...</div></div>
-    </div>
-
-    <div id="tab-orders" style="display:none;">
-        <div class="modal-box" style="width:100%; max-width:600px; margin:0 auto; position:relative; box-shadow:none;">
-            <h3 style="color:#fff; margin-top:0;">Registrar Factura</h3>
-            <div style="margin-bottom:15px;">
-                <label class="modal-label" style="font-size:10px; color:#888; display:block; margin-bottom:5px;">PROVEEDOR</label>
-                <select id="ordSupp" class="modal-select"></select>
+    <div id="view-new">
+        <div class="card-form">
+            <h3 style="margin-top:0; color:#fff;">Registrar Comprobante</h3>
+            
+            <div style="margin-bottom:20px;">
+                <label style="font-size:10px; color:#888;">PROVEEDOR</label>
+                <select id="ordSupp" class="modal-select" style="width:100%;"></select>
             </div>
+            
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px;">
-                <div><label style="font-size:10px; color:#888; display:block; margin-bottom:5px;">FECHA EMISIÓN</label><input type="date" id="ordDate" class="modal-input"></div>
-                <div><label style="font-size:10px; color:#888; display:block; margin-bottom:5px;">VENCIMIENTO</label><input type="date" id="ordDue" class="modal-input"></div>
+                <div><label style="font-size:10px; color:#888;">EMISIÓN</label><input type="date" id="ordDate" class="modal-input" style="width:100%;"></div>
+                <div><label style="font-size:10px; color:#888;">VENCIMIENTO</label><input type="date" id="ordDue" class="modal-input" style="width:100%;"></div>
             </div>
+
+            <hr style="border:0; border-top:1px dashed #333; margin:20px 0;">
+            
+            <label style="font-size:10px; color:#888; margin-bottom:10px; display:block;">DETALLE</label>
             <div id="itemsCont"></div>
-            <button onclick="addItemRow()" style="width:100%; border:1px dashed #444; background:none; color:#888; padding:10px; cursor:pointer;">+ AGREGAR ÍTEM</button>
-            <div class="total-bar">
-                <span style="font-size:12px; color:#888;">TOTAL</span>
-                <span id="ordTotal" style="font-size:24px; font-weight:900; color:#fff;">$0</span>
+            
+            <button onclick="addItemRow()" style="width:100%; padding:10px; background:none; border:1px dashed #444; color:#888; cursor:pointer; margin-bottom:20px;">+ AGREGAR ÍTEM</button>
+            
+            <div style="background:#1a1a1a; padding:15px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
+                <span style="font-size:11px; color:#888;">TOTAL</span>
+                <span id="ordTotal" style="font-size:24px; font-weight:900; color:#fff;">$ 0</span>
             </div>
-            <button onclick="saveOrder()" class="btn-modal-save" style="width:100%; padding:15px; margin-top:20px;">CONFIRMAR INGRESO</button>
+
+            <button onclick="saveOrder()" class="btn-modal-save" style="width:100%; padding:15px; margin-top:20px; background:var(--mc-accent-green); color:#000;">CONFIRMAR CARGA</button>
         </div>
     </div>
 
-    <div id="tab-history" style="display:none;">
-        <div class="section-header"><h2 class="section-title">Historial</h2></div>
-        <div id="histList" class="data-list"></div>
-    </div>
-  </div>
-
-  <div id="suppModal" class="modal-overlay">
-    <div class="modal-box">
-        <h3>Proveedor</h3>
-        <input type="hidden" id="sId">
-        <input type="text" id="sName" class="modal-input" placeholder="Nombre Empresa">
-        <input type="text" id="sContact" class="modal-input" placeholder="Contacto (Tel/Email)">
-        
-        <div style="display:flex; gap:10px;">
-            <input type="text" id="sBank" class="modal-input" placeholder="Banco" style="flex:1;">
-            <input type="text" id="sCbu" class="modal-input" placeholder="CBU / Alias" style="flex:2;">
-        </div>
-
-        <label style="font-size:10px; color:#666; margin-bottom:5px; display:block;">CONDICIÓN DE PAGO</label>
-        <div class="chip-container">
-            <div class="chip-option selected" onclick="selectTerm('Contado', this)">CONTADO</div>
-            <div class="chip-option" onclick="selectTerm('Cta Corriente', this)">CTA CORRIENTE</div>
-        </div>
-        <input type="hidden" id="sTerms" value="Contado">
-
-        <div class="modal-btns">
-            <button onclick="closeModal()" class="btn-modal-cancel">CANCELAR</button>
-            <button onclick="saveSupp()" class="btn-modal-save">GUARDAR</button>
-        </div>
+    <div id="view-hist" style="display:none;">
+        <div id="histList" class="data-list"><div class="loading-state">Cargando...</div></div>
     </div>
   </div>
 
@@ -107,176 +72,112 @@
     const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
     const user = localStorage.getItem('mc_admin_user');
     document.getElementById('roleBadge').innerText = user;
     document.getElementById('ordDate').valueAsDate = new Date();
 
-    let skus=[], supps=[];
+    let skus = [];
 
     window.onload = async () => {
-        try {
-            const [s, i] = await Promise.all([
-                client.from('suppliers').select('*').order('name'),
-                client.from('inventory_skus').select('id,name,cost_price').order('name')
-            ]);
-            supps = s.data||[]; skus = i.data||[];
-            renderSupps(); 
-            addItemRow();
-        } catch(e) { console.error(e); }
+        // Cargar Selects
+        const [s, i] = await Promise.all([
+            client.from('suppliers').select('id,name').eq('category','INSUMOS').order('name'), // Solo insumos por defecto? O todos?
+            client.from('inventory_skus').select('id,name,cost_price').order('name')
+        ]);
+        
+        // Cargar lista completa de proveedores en el select (no solo insumos, porque cargamos servicios también)
+        const { data: allSupps } = await client.from('suppliers').select('id,name').order('name');
+        
+        const sel = document.getElementById('ordSupp');
+        sel.innerHTML = '<option value="">Seleccionar...</option>' + (allSupps||[]).map(x=>`<option value="${x.id}">${x.name}</option>`).join('');
+        
+        skus = i.data || [];
+        addItemRow();
     };
 
-    function view(v, btn) {
-        ['suppliers','orders','history'].forEach(x=>document.getElementById('tab-'+x).style.display='none');
-        document.getElementById('tab-'+v).style.display='block';
-        if(btn){ document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); }
-        if(v==='history') loadHist();
+    function switchTab(v, btn) {
+        document.getElementById('view-new').style.display = v==='new'?'block':'none';
+        document.getElementById('view-hist').style.display = v==='hist'?'block':'none';
+        document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        if(v==='hist') loadHist();
     }
 
-    // --- PROVEEDORES ---
-    function renderSupps() {
-        const c = document.getElementById('suppList');
-        const sel = document.getElementById('ordSupp');
-        sel.innerHTML = '<option value="">Seleccionar...</option>' + supps.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
-        
-        if(!supps.length) { c.innerHTML = '<div class="empty-state">Sin datos. Agrega uno nuevo.</div>'; return; }
-        c.innerHTML = supps.map(s => `
-            <div class="data-card">
-                <div>
-                    <div class="card-title">${s.name}</div>
-                    <div class="card-sub" style="margin-bottom:4px;">📞 ${s.contact_info||'-'} • 💳 ${s.payment_terms||'Contado'}</div>
-                    ${s.cbu_alias ? `<div class="card-sub" style="color:#666; font-family:monospace; border:1px dashed #333; padding:4px; display:inline-block; border-radius:4px;">🏦 ${s.bank_name||''} : ${s.cbu_alias}</div>` : ''}
-                </div>
-                <button onclick="editS(${s.id})" style="border:1px solid #444; background:none; color:#fff; padding:8px; cursor:pointer;">✏️</button>
-            </div>`).join('');
-    }
-    
-    function selectTerm(val, el) {
-        document.getElementById('sTerms').value = val;
-        document.querySelectorAll('.chip-option').forEach(c => c.classList.remove('selected'));
-        el.classList.add('selected');
-    }
-
-    function modalSupp(){ 
-        document.getElementById('sId').value=''; 
-        document.getElementById('sName').value=''; 
-        document.getElementById('sContact').value=''; 
-        document.getElementById('sBank').value=''; 
-        document.getElementById('sCbu').value=''; 
-        selectTerm('Contado', document.querySelectorAll('.chip-option')[0]);
-        document.getElementById('suppModal').style.display='flex'; 
-    }
-    
-    function closeModal(){ document.getElementById('suppModal').style.display='none'; }
-    
-    function editS(id){ 
-        const s = supps.find(x=>x.id===id); 
-        document.getElementById('sId').value=s.id; 
-        document.getElementById('sName').value=s.name; 
-        document.getElementById('sContact').value=s.contact_info; 
-        document.getElementById('sBank').value=s.bank_name || ''; 
-        document.getElementById('sCbu').value=s.cbu_alias || ''; 
-        
-        // Seleccionar Chip correcto
-        const term = s.payment_terms === 'Cta Corriente' ? 'Cta Corriente' : 'Contado';
-        const idx = term === 'Contado' ? 0 : 1;
-        selectTerm(term, document.querySelectorAll('.chip-option')[idx]);
-        
-        document.getElementById('suppModal').style.display='flex'; 
-    }
-    
-    async function saveSupp(){
-        const btn = document.querySelector('.btn-modal-save');
-        btn.innerText = "...";
-        
-        const d = { 
-            name: document.getElementById('sName').value, 
-            contact_info: document.getElementById('sContact').value, 
-            payment_terms: document.getElementById('sTerms').value,
-            bank_name: document.getElementById('sBank').value,
-            cbu_alias: document.getElementById('sCbu').value
-        };
-        const id = document.getElementById('sId').value;
-
-        if(!d.name) { alert("Ingresa un nombre"); btn.innerText="GUARDAR"; return; }
-
-        let error;
-        if(id) { const r = await client.from('suppliers').update(d).eq('id',id); error = r.error; }
-        else { const r = await client.from('suppliers').insert(d); error = r.error; }
-
-        btn.innerText = "GUARDAR";
-        if(error) alert(error.message);
-        else { closeModal(); location.reload(); }
-    }
-
-    // --- NUEVA COMPRA ---
+    // Items
     window.addItemRow = () => {
-        const div = document.createElement('div'); div.className='item-row';
-        div.innerHTML = `
-            <select class="modal-select sku-sel" onchange="fillCost(this)" style="flex:2; margin:0;"><option value="">Insumo...</option>${skus.map(s=>`<option value="${s.id}" data-c="${s.cost_price}">${s.name}</option>`).join('')}</select>
-            <input type="number" class="modal-input qty" placeholder="Cant" oninput="calc()" style="width:70px; margin:0; text-align:center;">
-            <input type="number" class="modal-input cost" placeholder="$" oninput="calc()" style="width:90px; margin:0; text-align:right;">
-            <button onclick="this.parentElement.remove(); calc()" style="background:none; border:none; color:#f55; cursor:pointer; font-weight:bold;">✕</button>
+        const d = document.createElement('div'); d.className='item-row';
+        d.innerHTML = `
+            <select class="sku-select" onchange="fillCost(this)"><option value="">Ítem / Insumo...</option>${skus.map(s=>`<option value="${s.id}" data-c="${s.cost_price}">${s.name}</option>`).join('')}</select>
+            <input type="number" class="qty" placeholder="Cant" oninput="calc()">
+            <input type="number" class="cost" placeholder="$ Costo" oninput="calc()">
+            <button onclick="this.parentElement.remove();calc()" style="background:none; border:none; color:#f55;">✕</button>
         `;
-        document.getElementById('itemsCont').appendChild(div);
+        document.getElementById('itemsCont').appendChild(d);
     }
 
-    window.fillCost = (s) => { 
-        const opt = s.options[s.selectedIndex];
-        const cost = opt.getAttribute('data-c');
-        if(cost) s.parentElement.querySelector('.cost').value = cost; 
-        calc(); 
+    window.fillCost = (el) => {
+        const c = el.options[el.selectedIndex].getAttribute('data-c');
+        if(c) el.parentElement.querySelector('.cost').value = c;
+        calc();
     }
-    
+
     window.calc = () => {
-        let tot = 0;
-        document.querySelectorAll('#itemsCont > div').forEach(r => {
-            tot += (parseFloat(r.querySelector('.qty').value)||0) * (parseFloat(r.querySelector('.cost').value)||0);
+        let t = 0;
+        document.querySelectorAll('.item-row').forEach(r => {
+            t += (parseFloat(r.querySelector('.qty').value)||0) * (parseFloat(r.querySelector('.cost').value)||0);
         });
-        document.getElementById('ordTotal').innerText = '$'+tot.toLocaleString();
+        document.getElementById('ordTotal').innerText = '$ '+t.toLocaleString();
     }
 
     async function saveOrder() {
         const sup = document.getElementById('ordSupp').value;
-        if(!sup) return alert("Falta proveedor");
-        
+        if(!sup) return alert("Elige proveedor");
+
         const items = [];
-        document.querySelectorAll('#itemsCont > div').forEach(r => {
-            const s = r.querySelector('.sku-sel').value;
+        document.querySelectorAll('.item-row').forEach(r => {
+            const s = r.querySelector('.sku-select').value;
             const q = parseFloat(r.querySelector('.qty').value);
             const c = parseFloat(r.querySelector('.cost').value);
-            if(s && q) items.push({sku_id:s, quantity_ordered:q, unit_cost:c, total_line:q*c});
+            if(s && q) items.push({ sku_id:s, quantity_ordered:q, unit_cost:c, total_line:q*c });
         });
-        
-        if(!items.length) return alert("Agrega al menos un ítem");
+
+        if(!items.length) return alert("Carga al menos un ítem");
 
         const { data: ord, error } = await client.from('purchase_orders').insert({
-            supplier_id: sup, 
-            created_at: document.getElementById('ordDate').value, 
+            supplier_id: sup,
+            created_at: document.getElementById('ordDate').value,
             due_date: document.getElementById('ordDue').value || document.getElementById('ordDate').value,
-            total_amount: items.reduce((a,b)=>a+b.total_line,0), 
+            total_amount: items.reduce((a,b)=>a+b.total_line,0),
             status: 'received'
         }).select().single();
-        
+
         if(error) return alert(error.message);
-        
+
         await client.from('purchase_items').insert(items.map(i=>({...i, order_id:ord.id})));
-        
-        // Update Stock
+
+        // Impactar Stock y Costo
         for(const i of items) {
-            const { data: sku } = await client.from('inventory_skus').select('stock_current').eq('id', i.sku_id).single();
-            await client.from('inventory_skus').update({ stock_current: (sku.stock_current||0)+i.quantity_ordered, cost_price: i.unit_cost }).eq('id', i.sku_id);
+            const { data: sku } = await client.from('inventory_skus').select('stock_current').eq('id',i.sku_id).single();
+            await client.from('inventory_skus').update({
+                stock_current: (sku.stock_current||0)+i.quantity_ordered,
+                cost_price: i.unit_cost
+            }).eq('id',i.sku_id);
         }
-        alert("Compra guardada."); window.location.reload();
+        alert("Compra Guardada."); window.location.reload();
     }
 
     async function loadHist() {
         const { data } = await client.from('purchase_orders').select('*, suppliers(name)').order('created_at',{ascending:false}).limit(20);
-        document.getElementById('histList').innerHTML = data.map(o => `
-            <div class="data-card">
-                <div><div class="card-title">${o.suppliers?.name}</div><div class="card-sub">${o.created_at.split('T')[0]}</div></div>
+        document.getElementById('histList').innerHTML = (data||[]).map(o => `
+            <div class="data-card" style="background:#111; padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <div style="font-weight:700; color:#fff;">${o.suppliers?.name}</div>
+                    <div style="font-size:11px; color:#666;">${o.created_at.split('T')[0]} • Vence: ${o.due_date}</div>
+                </div>
                 <div style="text-align:right">
-                    <div style="font-weight:700; color:#fff;">$${o.total_amount.toLocaleString()}</div>
-                    <div style="font-size:9px; color:${o.payment_status==='paid'?'var(--mc-accent-green)':'var(--mc-red)'}">${o.payment_status?.toUpperCase() || 'IMPAGO'}</div>
+                    <div style="font-weight:900; color:#fff;">$${o.total_amount.toLocaleString()}</div>
+                    <div style="font-size:9px; color:${o.payment_status==='paid'?'#cdfb3e':'#e8372f'}">${o.payment_status?.toUpperCase()||'IMPAGO'}</div>
                 </div>
             </div>`).join('');
     }
