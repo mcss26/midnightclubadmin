@@ -7,77 +7,83 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
-    .bar-toolbar { 
-        background: #111; padding: 15px; border-radius: 8px; border: 1px solid #333; 
-        display: flex; gap: 15px; align-items: flex-end; margin-bottom: 20px; flex-wrap: wrap;
+    /* Estilos Tipo App (Simil Caja) */
+    .bar-selector-card { 
+        background: #111; padding: 25px; border-radius: 12px; border: 1px solid #333; margin-bottom: 20px;
     }
-    .status-badge { 
-        padding: 5px 10px; border-radius: 4px; font-weight: 800; font-size: 11px; text-transform: uppercase; 
-        display: inline-block; margin-left: 10px;
+    
+    .mode-header { 
+        padding: 20px; border-radius: 8px 8px 0 0; text-align: center; border: 1px solid; border-bottom: none;
     }
-    .st-open { background: var(--mc-accent-green); color: #000; }
-    .st-closed { background: #333; color: #888; border: 1px solid #555; }
-    .st-none { background: transparent; border: 1px dashed #444; color: #666; }
+    .mode-open { background: rgba(0, 234, 255, 0.1); border-color: var(--mc-accent-blue); color: var(--mc-accent-blue); }
+    .mode-close { background: rgba(255, 165, 0, 0.1); border-color: orange; color: orange; }
 
-    .qty-input { 
-        background: #000; border: 1px solid #333; color: #fff; width: 60px; 
-        text-align: center; padding: 8px; border-radius: 4px; font-weight: 700;
+    .stock-list-container {
+        background: #000; border: 1px solid #333; border-top: none; 
+        border-radius: 0 0 12px 12px; padding: 10px;
     }
-    .qty-input:focus { border-color: var(--mc-accent-blue); outline: none; }
-    .qty-ro { background: transparent; border: none; color: #666; font-family: monospace; width: 60px; text-align: center; }
 
-    .action-row { display: flex; justify-content: flex-end; margin-top: 20px; padding-top: 20px; border-top: 1px solid #333; }
+    .stock-item {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 15px; border-bottom: 1px solid #222;
+    }
+    .item-info { flex: 1; }
+    .item-name { font-weight: 700; color: #fff; font-size: 14px; margin-bottom: 4px; }
+    .item-meta { font-size: 10px; color: #666; font-family: monospace; }
+    
+    .qty-control { display: flex; align-items: center; gap: 10px; }
+    .big-input { 
+        width: 70px; background: #111; border: 1px solid #444; color: #fff; 
+        font-size: 20px; padding: 10px; text-align: center; border-radius: 8px; font-weight: 700;
+        outline: none;
+    }
+    .big-input:focus { border-color: #fff; background: #000; }
+    
+    .cat-header { 
+        background: #222; color: #aaa; font-size: 10px; font-weight: 800; 
+        padding: 8px 15px; text-transform: uppercase; letter-spacing: 1px; margin-top: 10px; border-radius: 4px;
+    }
+
+    .info-mapping { font-size: 11px; color: #666; margin-top: 5px; font-style: italic; }
   </style>
 </head>
 <body>
   <header class="admin-header">
-    <div class="admin-logo">MIDNIGHT<span style="color: var(--mc-accent-blue);">MOVIMIENTOS</span></div>
+    <div class="admin-logo">MIDNIGHT<span style="color: var(--mc-accent-blue);">BARRA</span></div>
     <button onclick="window.location.href='index.html'" class="btn-logout">VOLVER</button>
   </header>
 
-  <div class="admin-container">
+  <div class="admin-container" style="max-width: 600px;">
     
-    <div class="bar-toolbar">
-        <div>
-            <label class="input-label">FECHA OPERACIÓN</label>
-            <input type="date" id="opDate" class="modal-input" style="width:auto; margin:0;" onchange="loadSession()">
+    <div class="bar-selector-card">
+        <label class="input-label">1. ELEGIR FECHA Y BARRA</label>
+        <div style="display: grid; grid-template-columns: 1fr 2fr; gap: 10px; margin-bottom: 10px;">
+            <input type="date" id="opDate" class="modal-input" style="margin:0;" onchange="checkSession()">
+            <select id="barSelect" class="modal-select" style="margin:0;" onchange="updateMappingInfo(); checkSession()">
+                <option value="" disabled selected>Seleccionar ubicación...</option>
+                </select>
         </div>
-        <div style="flex-grow:1;">
-            <label class="input-label">SELECCIONAR BARRA</label>
-            <select id="barSelect" class="modal-select" onchange="loadSession()" style="margin:0;">
-                <option value="BARRA 1">BARRA 1 (Principal)</option>
-                <option value="BARRA 2">BARRA 2 (Patio)</option>
-                <option value="BARRA VIP">BARRA VIP</option>
-            </select>
+        <div id="mappingText" class="info-mapping">Selecciona una barra para ver sus cajas asociadas.</div>
+    </div>
+
+    <div id="loadingState" class="loading-state" style="display:none;">Buscando sesión activa...</div>
+    <div id="emptyState" class="empty-state">Selecciona una barra para comenzar.</div>
+
+    <div id="opPanel" style="display:none;">
+        
+        <div id="modeHeader" class="mode-header">
+            <h2 style="margin:0; font-family:'Outfit'; font-size:20px;" id="modeTitle">--</h2>
+            <div style="font-size:11px; margin-top:5px; opacity:0.8;" id="modeSubtitle">--</div>
         </div>
-        <div style="text-align:right;">
-            <label class="input-label">ESTADO</label>
-            <div id="sessionStatus" class="status-badge st-none">PENDIENTE</div>
+
+        <div class="stock-list-container" id="stockList">
+            </div>
+
+        <div style="margin-top: 20px;">
+            <button id="btnAction" class="btn-primary" onclick="saveSession()" style="width:100%; padding:18px; font-size:16px; border-radius:8px;">CONFIRMAR ACCIÓN</button>
         </div>
     </div>
 
-    <div id="mainPanel" style="display:none;">
-        <div class="table-responsive">
-            <table class="sku-table">
-                <thead>
-                    <tr>
-                        <th>Producto</th>
-                        <th style="text-align:center; width:80px;">Inicio</th>
-                        <th style="text-align:center; width:80px;">Repos.</th>
-                        <th style="text-align:center; width:80px;">Final</th>
-                        <th style="text-align:center; width:80px;">Consumo</th>
-                    </tr>
-                </thead>
-                <tbody id="stockBody"></tbody>
-            </table>
-        </div>
-
-        <div class="action-row">
-            <button id="btnAction" class="btn-primary" onclick="saveSession()" style="padding:15px 30px; font-size:16px;">GUARDAR APERTURA</button>
-        </div>
-    </div>
-
-    <div id="emptyMsg" class="empty-state" style="margin-top:50px;">Selecciona fecha y barra para comenzar.</div>
   </div>
 
   <script>
@@ -86,211 +92,254 @@
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     const user = localStorage.getItem('mc_admin_user');
 
-    document.getElementById('opDate').valueAsDate = new Date();
-    
+    // CONFIGURACIÓN DE BARRAS (Tu estructura real)
+    const BARS_CONFIG = [
+        { name: "BARRA 1", map: "Corresponde a Caja 1 y Caja 1.2" },
+        { name: "BARRA 2", map: "Corresponde a Caja 2 y Caja 3" },
+        { name: "BARRA VIP", map: "Corresponde a Caja 4" },
+        { name: "BARRA PATIO", map: "Corresponde a Caja 5" }
+    ];
+
     let currentSession = null;
     let products = [];
-    let itemsMap = {}; // sku_id -> { initial, added, final }
+    let itemsMap = {}; 
 
-    window.onload = loadSession;
+    // Inicialización
+    document.getElementById('opDate').valueAsDate = new Date();
+    
+    // Cargar Select
+    const sel = document.getElementById('barSelect');
+    BARS_CONFIG.forEach(b => {
+        const opt = document.createElement('option');
+        opt.value = b.name;
+        opt.innerText = b.name;
+        sel.appendChild(opt);
+    });
 
-    async function loadSession() {
+    function updateMappingInfo() {
+        const val = document.getElementById('barSelect').value;
+        const conf = BARS_CONFIG.find(b => b.name === val);
+        document.getElementById('mappingText').innerText = conf ? `ℹ️ ${conf.map}` : '';
+    }
+
+    async function checkSession() {
         const date = document.getElementById('opDate').value;
         const bar = document.getElementById('barSelect').value;
-        
-        document.getElementById('mainPanel').style.display = 'none';
-        document.getElementById('emptyMsg').innerText = 'Cargando...';
-        document.getElementById('emptyMsg').style.display = 'block';
+        if(!bar) return;
 
-        // 1. Buscar si ya existe sesión
+        // UI Reset
+        document.getElementById('opPanel').style.display = 'none';
+        document.getElementById('emptyState').style.display = 'none';
+        document.getElementById('loadingState').style.display = 'block';
+
+        // 1. Buscar Sesión
         const { data: session } = await client.from('bar_sessions')
             .select('*').eq('event_date', date).eq('bar_name', bar).maybeSingle();
-        
         currentSession = session;
-        updateStatusUI(session);
 
-        // 2. Cargar productos (Filtrados por categorías de barra)
-        const cats = ['APERITIVO','VODKA','GIN','WHISKY','RON','CERVEZA','CHAMPAGNE','VINOS','SOFT','ENERGIZANTE'];
-        // Nota: Ajusta 'in' según tus categorías exactas de SKUs
+        // 2. Cargar Productos (Solo SKUs relevantes para barra)
+        // Definir categorías de bebidas
+        const cats = ['APERITIVO','VODKA','GIN','WHISKY','RON','CERVEZA','CHAMPAGNE','VINOS','ENERGIZANTE','SOFT'];
         const { data: skus } = await client.from('inventory_skus')
             .select('id, name, category, stock_current')
             .in('category', cats)
             .order('category').order('name');
-        
         products = skus || [];
 
-        // 3. Si hay sesión, cargar items previos
+        // 3. Cargar Items previos si hay sesión
         itemsMap = {};
         if (session) {
             const { data: items } = await client.from('bar_session_items').select('*').eq('session_id', session.id);
             if(items) items.forEach(i => itemsMap[i.sku_id] = i);
         }
 
-        renderTable();
-        document.getElementById('mainPanel').style.display = 'block';
-        document.getElementById('emptyMsg').style.display = 'none';
+        renderAppMode();
+        document.getElementById('loadingState').style.display = 'none';
+        document.getElementById('opPanel').style.display = 'block';
     }
 
-    function updateStatusUI(s) {
-        const badge = document.getElementById('sessionStatus');
+    function renderAppMode() {
+        const container = document.getElementById('stockList');
+        const header = document.getElementById('modeHeader');
+        const title = document.getElementById('modeTitle');
+        const sub = document.getElementById('modeSubtitle');
         const btn = document.getElementById('btnAction');
         
-        if (!s) {
-            badge.className = 'status-badge st-none'; badge.innerText = 'NO INICIADA';
-            btn.innerText = 'CONFIRMAR APERTURA (RESTAR DEPOSITO)';
-            btn.className = 'btn-primary';
-            btn.disabled = false;
-        } else if (s.status === 'open') {
-            badge.className = 'status-badge st-open'; badge.innerText = 'ABIERTA / OPERANDO';
-            btn.innerText = 'CERRAR BARRA (GUARDAR CONTEO)';
-            btn.className = 'btn-refresh'; // Estilo distinto para cierre
-            btn.style.background = 'var(--mc-red)';
-            btn.style.color = '#fff';
-            btn.disabled = false;
-        } else {
-            badge.className = 'status-badge st-closed'; badge.innerText = 'CERRADA';
-            btn.innerText = 'BARRA CERRADA';
-            btn.className = 'btn-refresh';
-            btn.disabled = true;
-        }
-    }
+        container.innerHTML = '';
+        let html = '';
+        let lastCat = '';
 
-    function renderTable() {
-        const tbody = document.getElementById('stockBody');
+        // DEFINIR MODO
         const isClosed = currentSession?.status === 'closed';
         const isOpen = currentSession?.status === 'open';
-        
-        // Agrupar visualmente por categoría
-        let lastCat = '';
-        let html = '';
+        let mode = 'INIT'; // INIT (Crear), OPEN (Cerrar), READ (Ver)
 
+        if (!currentSession) mode = 'INIT';
+        else if (isOpen) mode = 'OPEN';
+        else mode = 'READ';
+
+        // AJUSTAR UI SEGÚN MODO
+        if (mode === 'INIT') {
+            header.className = 'mode-header mode-open';
+            title.innerText = 'APERTURA DE BARRA';
+            sub.innerText = 'Ingresa el stock inicial que sacas del depósito.';
+            btn.innerText = 'CONFIRMAR APERTURA Y RESTAR DEPÓSITO';
+            btn.style.background = 'var(--mc-accent-blue)';
+            btn.disabled = false;
+        } else if (mode === 'OPEN') {
+            header.className = 'mode-header mode-close';
+            title.innerText = 'CIERRE DE BARRA';
+            sub.innerText = 'Cuenta las botellas que quedaron (Llenas + Abiertas).';
+            btn.innerText = 'GUARDAR CONTEO FINAL';
+            btn.style.background = 'orange';
+            btn.disabled = false;
+        } else {
+            header.className = 'mode-header';
+            header.style.background = '#222'; header.style.color='#fff'; header.style.borderColor='#444';
+            title.innerText = 'BARRA CERRADA';
+            sub.innerText = 'Inventario finalizado.';
+            btn.innerText = 'CERRADO';
+            btn.style.background = '#333';
+            btn.disabled = true;
+        }
+
+        // RENDERIZAR LISTA
         products.forEach(p => {
-            if(p.category !== lastCat) {
-                html += `<tr><td colspan="5" style="background:#222; font-size:10px; font-weight:800; color:#888; letter-spacing:1px; padding:5px 10px;">${p.category}</td></tr>`;
+            // Separadores de Categoría
+            if (p.category !== lastCat) {
+                html += `<div class="cat-header">${p.category}</div>`;
                 lastCat = p.category;
             }
 
             const prev = itemsMap[p.id] || { qty_initial:0, qty_added:0, qty_final:0 };
-            const sold = (parseFloat(prev.qty_initial)||0) + (parseFloat(prev.qty_added)||0) - (parseFloat(prev.qty_final)||0);
-
-            // Logica de inputs según estado
-            let inpInit, inpAdd, inpFinal;
-
-            if (!currentSession) {
-                // Modo Apertura: Solo Initial editable
-                inpInit = `<input type="number" class="qty-input" id="ini_${p.id}" value="${prev.qty_initial||0}">`;
-                inpAdd = `<span class="qty-ro">-</span>`;
-                inpFinal = `<span class="qty-ro">-</span>`;
-            } else if (isOpen) {
-                // Modo Abierto: Reposición y Final editables (Initial fijo)
-                inpInit = `<span class="qty-ro">${prev.qty_initial}</span>`;
-                inpAdd = `<input type="number" class="qty-input" id="add_${p.id}" value="${prev.qty_added||0}" style="border-color:#444;">`;
-                inpFinal = `<input type="number" class="qty-input" id="fin_${p.id}" value="${prev.qty_final||0}" style="border-color:var(--mc-accent-green);">`;
+            
+            // Lógica de Inputs Intuitivos
+            let inputHtml = '';
+            
+            if (mode === 'INIT') {
+                // Solo muestra Input de Apertura
+                inputHtml = `
+                    <div style="text-align:right;">
+                        <div style="font-size:9px; color:#aaa; margin-bottom:2px;">INICIO</div>
+                        <input type="number" class="big-input" id="inp_${p.id}" placeholder="0" value="${prev.qty_initial||''}">
+                    </div>`;
+            } else if (mode === 'OPEN') {
+                // Muestra Info de Inicio y Input de Final
+                inputHtml = `
+                    <div style="display:flex; gap:15px; align-items:center;">
+                        <div style="text-align:center;">
+                            <div style="font-size:14px; font-weight:700; color:#fff;">${prev.qty_initial + prev.qty_added}</div>
+                            <div style="font-size:8px; color:#666;">TOTAL INI</div>
+                        </div>
+                        <div style="text-align:right;">
+                             <div style="font-size:9px; color:orange; margin-bottom:2px;">FINAL</div>
+                             <input type="number" class="big-input" id="inp_${p.id}" placeholder="0" style="border-color:orange; color:orange;">
+                        </div>
+                    </div>`;
             } else {
-                // Cerrado: Todo lectura
-                inpInit = `<span class="qty-ro">${prev.qty_initial}</span>`;
-                inpAdd = `<span class="qty-ro">${prev.qty_added}</span>`;
-                inpFinal = `<span class="qty-ro">${prev.qty_final}</span>`;
+                // Solo Lectura
+                const consumed = (prev.qty_initial + prev.qty_added) - prev.qty_final;
+                inputHtml = `
+                    <div style="text-align:right;">
+                        <span style="color:#666;">Consumo: </span><span style="color:#fff; font-weight:700; font-size:14px;">${consumed}</span>
+                    </div>`;
             }
 
             html += `
-            <tr>
-                <td>${p.name} <span style="font-size:9px; color:#444;">(Dep: ${p.stock_current})</span></td>
-                <td style="text-align:center;">${inpInit}</td>
-                <td style="text-align:center;">${inpAdd}</td>
-                <td style="text-align:center;">${inpFinal}</td>
-                <td style="text-align:center; font-weight:800; color:${isClosed?'#fff':'#666'}">${isClosed ? sold : '-'}</td>
-            </tr>`;
+            <div class="stock-item">
+                <div class="item-info">
+                    <div class="item-name">${p.name}</div>
+                    <div class="item-meta">En Depósito: ${p.stock_current}</div>
+                </div>
+                ${inputHtml}
+            </div>`;
         });
-        tbody.innerHTML = html;
+        container.innerHTML = html;
     }
 
     async function saveSession() {
         const date = document.getElementById('opDate').value;
         const bar = document.getElementById('barSelect').value;
-        
-        if(!confirm("¿Confirmar operación de stock? Esto impactará en el depósito.")) return;
+        const isOpening = !currentSession; // Si no hay sesión, estamos abriendo
+
+        if(!confirm(isOpening ? "¿Confirmar Apertura? Se restará mercadería del depósito global." : "¿Confirmar Cierre Final?")) return;
 
         let sessionId = currentSession?.id;
 
-        // A. CREAR SESIÓN SI NO EXISTE
-        if (!currentSession) {
+        // 1. CREAR SESIÓN SI ES APERTURA
+        if (isOpening) {
             const { data: newS, error } = await client.from('bar_sessions')
                 .insert({ event_date: date, bar_name: bar, opened_by: user, status: 'open' })
                 .select().single();
-            if(error) return alert(error.message);
+            if(error) return alert("Error creando sesión: " + error.message);
             sessionId = newS.id;
         }
 
         const updates = [];
         const movements = [];
-        
-        // B. RECORRER PRODUCTOS
+
+        // 2. RECORRER INPUTS
         for (const p of products) {
-            // Valores Inputs
-            const elIni = document.getElementById(`ini_${p.id}`);
-            const elAdd = document.getElementById(`add_${p.id}`);
-            const elFin = document.getElementById(`fin_${p.id}`);
-            
-            // Valores Previos
-            const old = itemsMap[p.id] || { qty_initial:0, qty_added:0 };
+            const input = document.getElementById(`inp_${p.id}`);
+            if(!input) continue; // Si estamos en modo lectura, no hay inputs
 
-            let valIni = elIni ? parseFloat(elIni.value)||0 : old.qty_initial;
-            let valAdd = elAdd ? parseFloat(elAdd.value)||0 : old.qty_added;
-            let valFin = elFin ? parseFloat(elFin.value)||0 : 0;
+            const val = parseFloat(input.value) || 0;
+            const old = itemsMap[p.id] || { qty_initial:0, qty_added:0, qty_final:0 };
 
-            // Detectar Cambios para Movimientos (Solo restamos del deposito lo NUEVO)
-            const diffIni = valIni - old.qty_initial; // Si subió el inicial
-            const diffAdd = valAdd - old.qty_added;   // Si hubo reposición
+            if (isOpening) {
+                // LOGICA APERTURA: Guardamos qty_initial
+                if (val > 0) { // Solo si cargó algo
+                    updates.push({
+                        session_id: sessionId,
+                        sku_id: p.id,
+                        qty_initial: val,
+                        qty_added: 0,
+                        qty_final: 0
+                    });
+                    
+                    // Movimiento de Stock (Resta Depósito)
+                    movements.push({
+                        sku_id: p.id,
+                        change_amount: -val,
+                        movement_type: 'APERTURA_BARRA',
+                        admin_name: user,
+                        notes: `${bar} - Apertura`
+                    });
 
-            const totalRestarDepo = diffIni + diffAdd;
-
-            if (totalRestarDepo !== 0) {
-                // Generar movimiento de egreso
-                movements.push({
+                    // Actualizar Depósito Global (Manual update para asegurar)
+                    const {data:curr} = await client.from('inventory_skus').select('stock_current').eq('id',p.id).single();
+                    if(curr) await client.from('inventory_skus').update({stock_current: curr.stock_current - val}).eq('id',p.id);
+                }
+            } else {
+                // LOGICA CIERRE: Guardamos qty_final (Upsert sobre lo existente)
+                updates.push({
+                    session_id: sessionId,
                     sku_id: p.id,
-                    change_amount: -totalRestarDepo, // Resta del depósito
-                    movement_type: currentSession ? 'REPOSICION' : 'APERTURA_BARRA',
-                    admin_name: user,
-                    notes: `${bar} - ${date}`
+                    qty_initial: old.qty_initial,
+                    qty_added: old.qty_added,
+                    qty_final: val
                 });
-                
-                // Actualizar stock master
-                await client.rpc('decrement_stock', { row_id: p.id, amount: totalRestarDepo }); 
-                // NOTA: Si no tienes una RPC function, usaremos update manual:
-                // await client.from('inventory_skus').update({stock_current: p.stock_current - totalRestarDepo}).eq('id',p.id);
-                // *Para simplificar en JS puro sin RPC:*
-                const {data:curr} = await client.from('inventory_skus').select('stock_current').eq('id',p.id).single();
-                await client.from('inventory_skus').update({stock_current: (curr.stock_current - totalRestarDepo)}).eq('id',p.id);
             }
-
-            // Preparar objeto para bar_session_items
-            updates.push({
-                session_id: sessionId,
-                sku_id: p.id,
-                qty_initial: valIni,
-                qty_added: valAdd,
-                qty_final: valFin
-            });
         }
 
-        // C. GUARDAR DETALLES
-        // Borramos previos de esta sesión y reinsertamos (más seguro para evitar conflictos)
-        await client.from('bar_session_items').delete().eq('session_id', sessionId);
-        await client.from('bar_session_items').insert(updates);
+        // 3. IMPACTAR DB
+        // Borrar detalle previo y re-insertar (estrategia segura para evitar duplicados en listas simples)
+        if(updates.length > 0) {
+            await client.from('bar_session_items').delete().eq('session_id', sessionId);
+            await client.from('bar_session_items').insert(updates);
+        }
 
-        // D. GUARDAR MOVIMIENTOS
-        if(movements.length > 0) {
+        if (movements.length > 0) {
             await client.from('inventory_movements').insert(movements);
         }
 
-        // E. CERRAR SESIÓN SI CORRESPONDE
-        if (currentSession && currentSession.status === 'open') {
+        // 4. CERRAR SESIÓN (Si correspondía)
+        if (!isOpening) {
             await client.from('bar_sessions').update({ status: 'closed', closed_by: user, closed_at: new Date() }).eq('id', sessionId);
         }
 
-        alert("✅ Movimientos guardados exitosamente.");
-        loadSession();
+        alert("✅ Operación guardada.");
+        checkSession(); // Recargar vista
     }
   </script>
 </body>
