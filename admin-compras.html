@@ -42,7 +42,9 @@
                 <div><label style="font-size:10px; color:#888;">FECHA EMISIÓN</label><input type="date" id="ordDate" class="modal-input"></div>
                 <div><label style="font-size:10px; color:#888;">VENCIMIENTO</label><input type="date" id="ordDue" class="modal-input"></div>
             </div>
+            
             <div id="itemsCont"></div>
+            
             <button onclick="addItemRow()" style="width:100%; border:1px dashed #444; background:none; color:#888; padding:10px; cursor:pointer;">+ AGREGAR ÍTEM</button>
             <div style="margin-top:20px; display:flex; justify-content:space-between; align-items:center;">
                 <span style="font-size:12px; color:#888;">TOTAL</span>
@@ -62,7 +64,7 @@
     <div class="modal-box">
         <h3>Proveedor</h3>
         <input type="hidden" id="sId">
-        <input type="text" id="sName" class="modal-input" placeholder="Nombre">
+        <input type="text" id="sName" class="modal-input" placeholder="Nombre (Ej: Quilmes)">
         <input type="text" id="sContact" class="modal-input" placeholder="Contacto">
         <input type="text" id="sTerms" class="modal-input" placeholder="Condición Pago">
         <div class="modal-btns">
@@ -83,12 +85,15 @@
     let skus=[], supps=[];
 
     window.onload = async () => {
-        const [s, i] = await Promise.all([
-            client.from('suppliers').select('*').order('name'),
-            client.from('inventory_skus').select('id,name,cost_price').order('name')
-        ]);
-        supps = s.data||[]; skus = i.data||[];
-        renderSupps(); addItemRow();
+        try {
+            const [s, i] = await Promise.all([
+                client.from('suppliers').select('*').order('name'),
+                client.from('inventory_skus').select('id,name,cost_price').order('name')
+            ]);
+            supps = s.data||[]; skus = i.data||[];
+            renderSupps(); 
+            addItemRow(); // Esto fallaba antes
+        } catch(e) { console.error(e); }
     };
 
     function view(v, btn) {
@@ -98,90 +103,111 @@
         if(v==='history') loadHist();
     }
 
-    // Suppliers
+    // --- PROVEEDORES ---
     function renderSupps() {
         const c = document.getElementById('suppList');
+        // Actualizar también el select de Nueva Compra
         const sel = document.getElementById('ordSupp');
         sel.innerHTML = '<option value="">Seleccionar...</option>' + supps.map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
         
-        if(!supps.length) { c.innerHTML = '<div class="empty-state">Sin datos.</div>'; return; }
+        if(!supps.length) { c.innerHTML = '<div class="empty-state">Sin datos. Agrega uno nuevo.</div>'; return; }
         c.innerHTML = supps.map(s => `
             <div class="data-card">
-                <div><div style="font-weight:700;">${s.name}</div><div style="font-size:11px; color:#666;">${s.contact_info}</div></div>
+                <div><div style="font-weight:700;">${s.name}</div><div style="font-size:11px; color:#666;">${s.contact_info||'-'}</div></div>
                 <button onclick="editS(${s.id})" style="border:1px solid #444; background:none; color:#fff; cursor:pointer;">✏️</button>
             </div>`).join('');
     }
     
-    function modalSupp(){ document.getElementById('sId').value=''; document.getElementById('sName').value=''; document.getElementById('suppModal').style.display='flex'; }
+    function modalSupp(){ document.getElementById('sId').value=''; document.getElementById('sName').value=''; document.getElementById('sContact').value=''; document.getElementById('sTerms').value=''; document.getElementById('suppModal').style.display='flex'; }
     function closeModal(){ document.getElementById('suppModal').style.display='none'; }
     function editS(id){ const s = supps.find(x=>x.id===id); document.getElementById('sId').value=s.id; document.getElementById('sName').value=s.name; document.getElementById('sContact').value=s.contact_info; document.getElementById('sTerms').value=s.payment_terms; document.getElementById('suppModal').style.display='flex'; }
     
     async function saveSupp(){
-        const d = { name: document.getElementById('sName').value, contact_info: document.getElementById('sContact').value, payment_terms: document.getElementById('sTerms').value };
+        const btn = document.querySelector('.btn-modal-save');
+        btn.innerText = "...";
+        
+        const d = { 
+            name: document.getElementById('sName').value, 
+            contact_info: document.getElementById('sContact').value, 
+            payment_terms: document.getElementById('sTerms').value 
+        };
         const id = document.getElementById('sId').value;
-        if(id) await client.from('suppliers').update(d).eq('id',id); else await client.from('suppliers').insert(d);
-        closeModal(); window.location.reload();
+
+        if(!d.name) { alert("Ingresa un nombre"); btn.innerText="GUARDAR"; return; }
+
+        let error;
+        if(id) { const r = await client.from('suppliers').update(d).eq('id',id); error = r.error; }
+        else { const r = await client.from('suppliers').insert(d); error = r.error; }
+
+        btn.innerText = "GUARDAR";
+        if(error) alert(error.message);
+        else { closeModal(); location.reload(); }
     }
 
-    // Orders
+    // --- NUEVA COMPRA ---
     window.addItemRow = () => {
-        const div = document.createElement('div'); div.className='item-row'; div.style.marginBottom='10px'; div.style.display='flex'; div.style.gap='10px';
+        const div = document.createElement('div'); 
+        div.style.cssText='display:flex; gap:10px; margin-bottom:10px; align-items:center;';
         div.innerHTML = `
             <select class="modal-select sku-sel" onchange="fillCost(this)" style="flex:2; margin:0;"><option value="">Insumo...</option>${skus.map(s=>`<option value="${s.id}" data-c="${s.cost_price}">${s.name}</option>`).join('')}</select>
             <input type="number" class="modal-input qty" placeholder="Cant" oninput="calc()" style="width:70px; margin:0; text-align:center;">
-            <input type="number" class="modal-input cost" placeholder="$" oninput="calc()" style="width:90px; margin:0; text-align:right;">
-            <button onclick="this.parentElement.remove(); calc()" style="background:none; border:none; color:#f55; cursor:pointer;">✕</button>
+            <input type="number" class="modal-input cost" placeholder="$ Costo" oninput="calc()" style="width:90px; margin:0; text-align:right;">
+            <button onclick="this.parentElement.remove(); calc()" style="background:none; border:none; color:#f55; cursor:pointer; font-weight:bold;">✕</button>
         `;
-        document.getElementById('itemsItemsContainer').appendChild(div); // Typo corrected in DOM ID
-    }
-    // Correction: ID in HTML was orderItemsContainer
-    window.addItemRow = () => {
-        const div = document.createElement('div'); div.style.cssText='display:flex; gap:10px; margin-bottom:10px;';
-        div.innerHTML = `
-            <select class="modal-select sku-sel" onchange="fillCost(this)" style="flex:2; margin:0;"><option value="">Insumo...</option>${skus.map(s=>`<option value="${s.id}" data-c="${s.cost_price}">${s.name}</option>`).join('')}</select>
-            <input type="number" class="modal-input qty" placeholder="Cant" oninput="calc()" style="width:70px; margin:0; text-align:center;">
-            <input type="number" class="modal-input cost" placeholder="$" oninput="calc()" style="width:90px; margin:0; text-align:right;">
-            <button onclick="this.parentElement.remove(); calc()" style="background:none; border:none; color:#f55; cursor:pointer;">✕</button>
-        `;
-        document.getElementById('orderItemsContainer').appendChild(div);
+        // Corrección: Usamos el ID correcto 'itemsCont'
+        document.getElementById('itemsCont').appendChild(div);
     }
 
-    window.fillCost = (s) => { s.parentElement.querySelector('.cost').value = s.options[s.selectedIndex].getAttribute('data-c'); calc(); }
+    window.fillCost = (s) => { 
+        const opt = s.options[s.selectedIndex];
+        const cost = opt.getAttribute('data-c');
+        // Solo llenar si tiene costo
+        if(cost) s.parentElement.querySelector('.cost').value = cost; 
+        calc(); 
+    }
     
     window.calc = () => {
         let tot = 0;
-        document.querySelectorAll('#orderItemsContainer > div').forEach(r => {
+        document.querySelectorAll('#itemsCont > div').forEach(r => {
             tot += (parseFloat(r.querySelector('.qty').value)||0) * (parseFloat(r.querySelector('.cost').value)||0);
         });
-        document.getElementById('orderTotal').innerText = '$'+tot.toLocaleString();
+        document.getElementById('ordTotal').innerText = '$'+tot.toLocaleString();
     }
 
     async function saveOrder() {
         const sup = document.getElementById('ordSupp').value;
         if(!sup) return alert("Falta proveedor");
+        
         const items = [];
-        document.querySelectorAll('#orderItemsContainer > div').forEach(r => {
+        document.querySelectorAll('#itemsCont > div').forEach(r => {
             const s = r.querySelector('.sku-sel').value;
             const q = parseFloat(r.querySelector('.qty').value);
             const c = parseFloat(r.querySelector('.cost').value);
             if(s && q) items.push({sku_id:s, quantity_ordered:q, unit_cost:c, total_line:q*c});
         });
         
+        if(!items.length) return alert("Agrega al menos un ítem");
+
         const { data: ord, error } = await client.from('purchase_orders').insert({
-            supplier_id: sup, created_at: document.getElementById('ordDate').value, due_date: document.getElementById('ordDue').value,
-            total_amount: items.reduce((a,b)=>a+b.total_line,0), status: 'received'
+            supplier_id: sup, 
+            created_at: document.getElementById('ordDate').value, 
+            due_date: document.getElementById('ordDue').value || document.getElementById('ordDate').value,
+            total_amount: items.reduce((a,b)=>a+b.total_line,0), 
+            status: 'received'
         }).select().single();
         
         if(error) return alert(error.message);
         
+        // Detalles
         await client.from('purchase_items').insert(items.map(i=>({...i, order_id:ord.id})));
         
-        // Update Stock
+        // Actualizar Stock
         for(const i of items) {
             const { data: sku } = await client.from('inventory_skus').select('stock_current').eq('id', i.sku_id).single();
             await client.from('inventory_skus').update({ stock_current: (sku.stock_current||0)+i.quantity_ordered, cost_price: i.unit_cost }).eq('id', i.sku_id);
         }
-        alert("Guardado"); window.location.reload();
+        alert("Compra guardada y stock actualizado."); 
+        window.location.reload();
     }
 
     async function loadHist() {
