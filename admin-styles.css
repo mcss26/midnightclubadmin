@@ -95,3 +95,31 @@ body { margin: 0; padding: 0; background-color: var(--mc-bg); color: var(--mc-te
 /* === UTILS === */
 .search-input-admin { width: 100%; padding: 12px; background: #000; border: 1px solid #333; color: #fff; border-radius: 6px; margin-bottom: 15px; box-sizing: border-box;}
 canvas { background: #fff; border-radius: 4px; cursor: crosshair; touch-action: none; width: 100%; }
+
+/* === LOGIN SCREEN === */
+#login-overlay { 
+    position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+    background: #000; z-index: 9999; 
+    display: flex; justify-content: center; align-items: center; 
+}
+.login-box { 
+    background: #111; border: 1px solid #333; padding: 40px; 
+    width: 90%; max-width: 320px; border-radius: 12px; text-align: center; 
+    box-shadow: 0 0 50px rgba(232, 55, 47, 0.1); /* Brillo rojo sutil */
+}
+.login-input { 
+    width: 100%; padding: 15px; margin-bottom: 15px; 
+    background: #000; border: 1px solid #333; color: #fff; 
+    border-radius: 6px; font-family: 'Inter', sans-serif; font-size: 14px;
+    box-sizing: border-box; text-align: center; outline: none;
+}
+.login-input:focus { border-color: var(--mc-red); }
+.btn-login { 
+    width: 100%; padding: 15px; background: var(--mc-red); 
+    color: #fff; border: none; font-weight: 800; font-family: 'Outfit', sans-serif; 
+    font-size: 16px; border-radius: 6px; cursor: pointer; letter-spacing: 1px;
+}
+.btn-login:hover { background: #ff4d4d; }
+.login-error { 
+    color: var(--mc-red); font-size: 12px; margin-bottom: 15px; display: none; 
+}

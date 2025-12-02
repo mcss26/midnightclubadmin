@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Midnight Staff — Cierre</title>
+  <link rel="stylesheet" href="admin-styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="admin-header" style="background:#111;">
+    <div class="admin-logo">MIDNIGHT<span style="color: #fff;">STAFF</span></div>
+    <button onclick="window.location.href='index.html'" class="btn-logout">SALIR</button>
+  </header>
+
+  <div class="admin-container" style="max-width:400px; margin-top:40px;">
+    
+    <h2 style="font-family:'Outfit'; text-align:center; margin-bottom:30px; color:#fff;">DECLARACIÓN DE CAJA</h2>
+
+    <div class="dash-card" style="height:auto; padding:30px; border:1px solid #333;">
+        
+        <label class="input-label">TU NOMBRE / USUARIO</label>
+        <div id="staffName" style="color:#fff; font-weight:700; margin-bottom:20px; font-size:16px;">--</div>
+
+        <label class="input-label">SELECCIONA TU CAJA</label>
+        <select id="termSelect" class="modal-select" style="margin-bottom:20px;">
+            <option value="">Cargando...</option>
+        </select>
+
+        <label class="input-label" style="color:var(--mc-accent-green);">EFECTIVO CONTADO (BILLETES)</label>
+        <input type="number" id="cashInput" class="modal-input" placeholder="$ 0" style="font-size:24px; text-align:center; font-weight:700; color:var(--mc-accent-green); margin-bottom:20px;">
+
+        <label class="input-label">GASTOS / VALES (PAPEL)</label>
+        <input type="number" id="expInput" class="modal-input" placeholder="$ 0" style="margin-bottom:20px;">
+
+        <button onclick="submitClose()" class="btn-primary" style="width:100%; padding:15px; font-size:16px; margin-top:10px;">ENVIAR CIERRE 🔒</button>
+
+    </div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    const user = localStorage.getItem('mc_admin_user');
+    if(!user) window.location.href = 'index.html';
+    document.getElementById('staffName').innerText = user.toUpperCase();
+
+    window.onload = async () => {
+        // Cargar Terminales
+        const { data } = await client.from('pos_terminals').select('friendly_name').order('friendly_name');
+        const sel = document.getElementById('termSelect');
+        if(data) {
+            // Filtrar duplicados
+            const unique = [...new Set(data.map(i => i.friendly_name))];
+            sel.innerHTML = unique.map(n => `<option value="${n}">${n}</option>`).join('');
+        }
+    };
+
+    async function submitClose() {
+        const term = document.getElementById('termSelect').value;
+        const cash = document.getElementById('cashInput').value;
+        const exp = document.getElementById('expInput').value || 0;
+
+        if(!cash) return alert("Ingresa el monto de efectivo.");
+        if(!confirm(`¿Confirmas cerrar la caja ${term} con $${cash}?`)) return;
+
+        const today = new Date().toISOString().split('T')[0];
+
+        // 1. Asegurar que existe cabecera de cierre para hoy
+        let { data: head } = await client.from('cash_closings').select('id').eq('event_date', today).single();
+        
+        if(!head) {
+            // Si no existe (es la primera caja en cerrar), la creamos
+            const { data: newHead, error } = await client.from('cash_closings').insert({ event_date: today, status: 'open' }).select().single();
+            if(error) return alert("Error al iniciar cierre diario: " + error.message);
+            head = newHead;
+        }
+
+        // 2. Insertar/Actualizar el detalle de ESTA terminal
+        // Usamos upsert para que si corrige el monto, se sobrescriba
+        const { error: err2 } = await client.from('closing_terminals').upsert({
+            closing_id: head.id,
+            terminal_name: term,
+            final_count_cash: parseFloat(cash),
+            other_expenses: parseFloat(exp)
+        }, { onConflict: 'closing_id, terminal_name' }); 
+        // Nota: requiere que en DB exista constraint unique(closing_id, terminal_name)
+        // Si no existe constraint, puede duplicar. Para PWA simple asumimos insert directo:
+        if(err2) {
+             // Si falla el upsert por falta de constraint, probamos delete+insert manual
+             await client.from('closing_terminals').delete().eq('closing_id', head.id).eq('terminal_name', term);
+             await client.from('closing_terminals').insert({
+                closing_id: head.id, terminal_name: term, final_count_cash: cash, other_expenses: exp
+             });
+        }
+
+        alert("✅ Cierre enviado correctamente.");
+        window.location.href = 'index.html';
+    }
+  </script>
+</body>
+</html>
