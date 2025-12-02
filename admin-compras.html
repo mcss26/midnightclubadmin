@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Midnight Admin — Compras</title>
+  <title>Midnight Admin — Compras & Gastos</title>
   <link rel="stylesheet" href="admin-styles.css" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -12,15 +12,29 @@
     .tab-btn { background:none; border:none; color:#666; padding:15px 5px; cursor:pointer; font-family:'Outfit'; font-size:14px; border-bottom:2px solid transparent; }
     .tab-btn.active { color:#fff; border-color:var(--mc-accent-green); font-weight:700; }
     
-    .card-form { background:#111; border:1px solid #333; padding:25px; border-radius:12px; max-width:600px; }
-    .item-row { display:flex; gap:10px; margin-bottom:10px; align-items:center; }
-    .sku-select { flex:2; background:#000; border:1px solid #333; color:#fff; padding:10px; border-radius:4px; }
-    .qty, .cost { width:80px; background:#000; border:1px solid #333; color:#fff; padding:10px; text-align:right; border-radius:4px; }
+    .card-form { background:#111; border:1px solid #333; padding:25px; border-radius:12px; max-width:800px; margin: 0 auto; }
+    
+    .mode-badge { padding: 5px 10px; border-radius: 4px; font-size: 10px; font-weight: 800; text-transform: uppercase; display: inline-block; margin-left: 10px; }
+    .bdg-stock { background: rgba(205, 251, 62, 0.2); color: #cdfb3e; border: 1px solid #cdfb3e; }
+    .bdg-gasto { background: rgba(0, 234, 255, 0.2); color: #00eaff; border: 1px solid #00eaff; }
+
+    /* Tabla de Items (Modo Stock) */
+    .item-row { display:grid; grid-template-columns: 3fr 1fr 1fr 30px; gap:10px; margin-bottom:10px; align-items:center; }
+    .sku-select { background:#000; border:1px solid #333; color:#fff; padding:10px; border-radius:4px; width: 100%; }
+    .qty, .cost { background:#000; border:1px solid #333; color:#fff; padding:10px; text-align:right; border-radius:4px; width: 100%; box-sizing: border-box; }
+
+    /* Campos de Gasto (Modo Gasto) */
+    .expense-panel { background: #080808; padding: 20px; border-radius: 8px; border: 1px dashed #444; margin-top: 20px; text-align: center; }
+    .big-money-input { background: transparent; border: none; font-size: 32px; color: #fff; font-weight: 900; text-align: center; width: 100%; outline: none; }
+    .big-money-input::placeholder { color: #333; }
+
+    .hist-card { display: flex; justify-content: space-between; align-items: center; padding: 15px; border-bottom: 1px solid #222; }
+    .hist-card:last-child { border-bottom: none; }
   </style>
 </head>
 <body>
   <header class="admin-header">
-    <div class="admin-logo">MIDNIGHT<span style="color: #FFD700;">FINANZAS</span> / COMPRAS</div>
+    <div class="admin-logo">MIDNIGHT<span style="color: #FFD700;">FINANZAS</span></div>
     <div style="display:flex; gap:10px;">
         <span id="roleBadge" style="font-size:10px; color:#888; padding:5px;"></span>
         <button onclick="window.location.href='index.html'" class="btn-logout">VOLVER</button>
@@ -29,42 +43,65 @@
 
   <div class="admin-container">
     <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('new', this)">NUEVA COMPRA / GASTO</button>
-        <button class="tab-btn" onclick="switchTab('hist', this)">HISTORIAL</button>
+        <button class="tab-btn active" onclick="switchTab('new', this)">NUEVA FACTURA</button>
+        <button class="tab-btn" onclick="switchTab('hist', this)">HISTORIAL & PAGOS</button>
     </div>
 
     <div id="view-new">
         <div class="card-form">
-            <h3 style="margin-top:0; color:#fff;">Registrar Comprobante</h3>
+            <h3 style="margin-top:0; color:#fff; display:flex; align-items:center;">
+                Registrar Comprobante
+                <span id="modeLabel" class="mode-badge" style="display:none;"></span>
+            </h3>
             
-            <div style="margin-bottom:20px;">
-                <label style="font-size:10px; color:#888;">PROVEEDOR</label>
-                <select id="ordSupp" class="modal-select" style="width:100%;"></select>
-            </div>
-            
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px; margin-bottom:20px;">
-                <div><label style="font-size:10px; color:#888;">EMISIÓN</label><input type="date" id="ordDate" class="modal-input" style="width:100%;"></div>
-                <div><label style="font-size:10px; color:#888;">VENCIMIENTO</label><input type="date" id="ordDue" class="modal-input" style="width:100%;"></div>
-            </div>
-
-            <hr style="border:0; border-top:1px dashed #333; margin:20px 0;">
-            
-            <label style="font-size:10px; color:#888; margin-bottom:10px; display:block;">DETALLE</label>
-            <div id="itemsCont"></div>
-            
-            <button onclick="addItemRow()" style="width:100%; padding:10px; background:none; border:1px dashed #444; color:#888; cursor:pointer; margin-bottom:20px;">+ AGREGAR ÍTEM</button>
-            
-            <div style="background:#1a1a1a; padding:15px; border-radius:8px; display:flex; justify-content:space-between; align-items:center;">
-                <span style="font-size:11px; color:#888;">TOTAL</span>
-                <span id="ordTotal" style="font-size:24px; font-weight:900; color:#fff;">$ 0</span>
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                <div>
+                    <label class="input-label">PROVEEDOR</label>
+                    <select id="ordSupp" class="modal-select" onchange="detectMode()" style="margin:0;"></select>
+                </div>
+                <div>
+                    <label class="input-label">EMISIÓN</label>
+                    <input type="date" id="ordDate" class="modal-input" style="margin:0;">
+                </div>
+                <div>
+                    <label class="input-label">VENCIMIENTO</label>
+                    <input type="date" id="ordDue" class="modal-input" style="margin:0;">
+                </div>
             </div>
 
-            <button onclick="saveOrder()" class="btn-modal-save" style="width:100%; padding:15px; margin-top:20px; background:var(--mc-accent-green); color:#000;">CONFIRMAR CARGA</button>
+            <div style="border-top: 1px solid #333; margin-bottom: 20px;"></div>
+
+            <div id="panelStock" style="display:none;">
+                <label class="input-label">DETALLE DE PRODUCTOS (IMPACTA STOCK)</label>
+                <div id="itemsCont"></div>
+                <button onclick="addItemRow()" style="width:100%; padding:10px; background:none; border:1px dashed #444; color:#888; cursor:pointer; margin-top:10px;">+ AGREGAR ÍTEM</button>
+                
+                <div style="text-align:right; margin-top:20px;">
+                    <span style="font-size:11px; color:#888;">TOTAL CALCULADO</span>
+                    <div id="calcTotal" style="font-size:24px; font-weight:900; color:#fff;">$ 0</div>
+                </div>
+            </div>
+
+            <div id="panelExpense" style="display:none;">
+                <div class="expense-panel">
+                    <label class="input-label">IMPORTE TOTAL FACTURA</label>
+                    <div style="display:flex; align-items:center; justify-content:center;">
+                        <span style="font-size:32px; color:#444;">$</span>
+                        <input type="number" id="expTotal" class="big-money-input" placeholder="0.00">
+                    </div>
+                    <label class="input-label" style="margin-top:20px;">CONCEPTO / DETALLE</label>
+                    <input type="text" id="expNotes" class="modal-input" placeholder="Ej: Factura Mes Marzo" style="text-align:center;">
+                </div>
+            </div>
+
+            <button onclick="saveOrder()" class="btn-primary" style="width:100%; padding:15px; margin-top:20px; font-size:16px;">CONFIRMAR CARGA 💾</button>
         </div>
     </div>
 
     <div id="view-hist" style="display:none;">
-        <div id="histList" class="data-list"><div class="loading-state">Cargando...</div></div>
+        <div class="card-form" style="padding:0; overflow:hidden;">
+            <div id="histList"><div class="loading-state" style="padding:20px;">Cargando...</div></div>
+        </div>
     </div>
   </div>
 
@@ -76,42 +113,68 @@
     const user = localStorage.getItem('mc_admin_user');
     document.getElementById('roleBadge').innerText = user;
     document.getElementById('ordDate').valueAsDate = new Date();
+    document.getElementById('ordDue').valueAsDate = new Date(); // Default hoy
 
+    let supps = [];
     let skus = [];
+    let currentMode = null; // 'STOCK' o 'GASTO'
 
     window.onload = async () => {
-        // Cargar Selects
-        const [s, i] = await Promise.all([
-            client.from('suppliers').select('id,name').eq('category','INSUMOS').order('name'), // Solo insumos por defecto? O todos?
+        // Cargar Datos Maestros
+        const [sData, iData] = await Promise.all([
+            client.from('suppliers').select('*').order('name'),
             client.from('inventory_skus').select('id,name,cost_price').order('name')
         ]);
         
-        // Cargar lista completa de proveedores en el select (no solo insumos, porque cargamos servicios también)
-        const { data: allSupps } = await client.from('suppliers').select('id,name').order('name');
-        
+        supps = sData.data || [];
+        skus = iData.data || [];
+
+        // Llenar Select Proveedores
         const sel = document.getElementById('ordSupp');
-        sel.innerHTML = '<option value="">Seleccionar...</option>' + (allSupps||[]).map(x=>`<option value="${x.id}">${x.name}</option>`).join('');
-        
-        skus = i.data || [];
-        addItemRow();
+        sel.innerHTML = '<option value="">Seleccionar...</option>' + 
+            supps.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
     };
 
-    function switchTab(v, btn) {
-        document.getElementById('view-new').style.display = v==='new'?'block':'none';
-        document.getElementById('view-hist').style.display = v==='hist'?'block':'none';
-        document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-        btn.classList.add('active');
-        if(v==='hist') loadHist();
+    function detectMode() {
+        const id = document.getElementById('ordSupp').value;
+        const panelS = document.getElementById('panelStock');
+        const panelE = document.getElementById('panelExpense');
+        const badge = document.getElementById('modeLabel');
+        const itemsC = document.getElementById('itemsCont');
+
+        if (!id) {
+            panelS.style.display = 'none'; panelE.style.display = 'none'; badge.style.display = 'none';
+            return;
+        }
+
+        const s = supps.find(x => x.id == id);
+        
+        // REGLA INTELIGENTE: Si es INSUMOS, pedimos SKUs. Si no, es Gasto P&L.
+        if (s.category === 'INSUMOS') {
+            currentMode = 'STOCK';
+            panelS.style.display = 'block';
+            panelE.style.display = 'none';
+            badge.innerText = 'INGRESO DE STOCK'; badge.className = 'mode-badge bdg-stock'; badge.style.display = 'inline-block';
+            if (itemsC.innerHTML === '') addItemRow(); // Agregar primera fila si está vacío
+        } else {
+            currentMode = 'GASTO';
+            panelS.style.display = 'none';
+            panelE.style.display = 'block';
+            badge.innerText = 'REGISTRO DE GASTO'; badge.className = 'mode-badge bdg-gasto'; badge.style.display = 'inline-block';
+        }
     }
 
-    // Items
+    // --- MODO STOCK: Lógica de Items ---
     window.addItemRow = () => {
         const d = document.createElement('div'); d.className='item-row';
         d.innerHTML = `
-            <select class="sku-select" onchange="fillCost(this)"><option value="">Ítem / Insumo...</option>${skus.map(s=>`<option value="${s.id}" data-c="${s.cost_price}">${s.name}</option>`).join('')}</select>
+            <select class="sku-select" onchange="fillCost(this)">
+                <option value="">Producto...</option>
+                ${skus.map(s=>`<option value="${s.id}" data-c="${s.cost_price}">${s.name}</option>`).join('')}
+            </select>
             <input type="number" class="qty" placeholder="Cant" oninput="calc()">
-            <input type="number" class="cost" placeholder="$ Costo" oninput="calc()">
-            <button onclick="this.parentElement.remove();calc()" style="background:none; border:none; color:#f55;">✕</button>
+            <input type="number" class="cost" placeholder="$ Unit" oninput="calc()">
+            <button onclick="this.parentElement.remove();calc()" style="background:none; border:none; color:#666; cursor:pointer;">✕</button>
         `;
         document.getElementById('itemsCont').appendChild(d);
     }
@@ -127,59 +190,129 @@
         document.querySelectorAll('.item-row').forEach(r => {
             t += (parseFloat(r.querySelector('.qty').value)||0) * (parseFloat(r.querySelector('.cost').value)||0);
         });
-        document.getElementById('ordTotal').innerText = '$ '+t.toLocaleString();
+        document.getElementById('calcTotal').innerText = '$ '+t.toLocaleString();
     }
 
+    // --- GUARDAR ---
     async function saveOrder() {
-        const sup = document.getElementById('ordSupp').value;
-        if(!sup) return alert("Elige proveedor");
+        const supId = document.getElementById('ordSupp').value;
+        if (!supId) return alert("Selecciona un proveedor.");
+        
+        let totalAmount = 0;
+        let items = [];
+        let note = '';
 
-        const items = [];
-        document.querySelectorAll('.item-row').forEach(r => {
-            const s = r.querySelector('.sku-select').value;
-            const q = parseFloat(r.querySelector('.qty').value);
-            const c = parseFloat(r.querySelector('.cost').value);
-            if(s && q) items.push({ sku_id:s, quantity_ordered:q, unit_cost:c, total_line:q*c });
-        });
+        if (currentMode === 'STOCK') {
+            // Recolectar Items
+            document.querySelectorAll('.item-row').forEach(r => {
+                const s = r.querySelector('.sku-select').value;
+                const q = parseFloat(r.querySelector('.qty').value);
+                const c = parseFloat(r.querySelector('.cost').value);
+                if(s && q) items.push({ sku_id:s, quantity_ordered:q, unit_cost:c });
+            });
+            if(!items.length) return alert("Agrega al menos un producto.");
+            totalAmount = items.reduce((a,b)=>a+(b.quantity_ordered*b.unit_cost), 0);
+            note = 'Reposición de Stock';
+        } else {
+            // Recolectar Gasto
+            totalAmount = parseFloat(document.getElementById('expTotal').value);
+            note = document.getElementById('expNotes').value || 'Gasto General';
+            if (!totalAmount) return alert("Ingresa el monto total.");
+        }
 
-        if(!items.length) return alert("Carga al menos un ítem");
-
+        // 1. Guardar Cabecera (Purchase Order)
         const { data: ord, error } = await client.from('purchase_orders').insert({
-            supplier_id: sup,
+            supplier_id: supId,
             created_at: document.getElementById('ordDate').value,
-            due_date: document.getElementById('ordDue').value || document.getElementById('ordDate').value,
-            total_amount: items.reduce((a,b)=>a+b.total_line,0),
-            status: 'received'
+            due_date: document.getElementById('ordDue').value,
+            total_amount: totalAmount,
+            status: 'received' // Asumimos factura recibida
         }).select().single();
 
-        if(error) return alert(error.message);
+        if (error) return alert("Error: " + error.message);
 
-        await client.from('purchase_items').insert(items.map(i=>({...i, order_id:ord.id})));
+        // 2. Si es STOCK: Guardar Items e Impactar Inventario
+        if (currentMode === 'STOCK') {
+            const itemsPayload = items.map(i => ({ ...i, order_id: ord.id }));
+            await client.from('purchase_items').insert(itemsPayload);
 
-        // Impactar Stock y Costo
-        for(const i of items) {
-            const { data: sku } = await client.from('inventory_skus').select('stock_current').eq('id',i.sku_id).single();
-            await client.from('inventory_skus').update({
-                stock_current: (sku.stock_current||0)+i.quantity_ordered,
-                cost_price: i.unit_cost
-            }).eq('id',i.sku_id);
+            // Generar Movimientos de Inventario y Actualizar Costos
+            const movements = [];
+            for (const i of items) {
+                // Actualizar Costo y Stock en Maestro
+                const {data:curr} = await client.from('inventory_skus').select('stock_current').eq('id',i.sku_id).single();
+                const newStock = (parseFloat(curr.stock_current)||0) + i.quantity_ordered;
+                
+                await client.from('inventory_skus').update({
+                    stock_current: newStock,
+                    cost_price: i.unit_cost // Actualizamos costo al último precio de compra
+                }).eq('id', i.sku_id);
+
+                movements.push({
+                    sku_id: i.sku_id,
+                    change_amount: i.quantity_ordered,
+                    movement_type: 'COMPRA',
+                    admin_name: user,
+                    notes: `Orden #${ord.id}`
+                });
+            }
+            await client.from('inventory_movements').insert(movements);
+        } else {
+            // Si es GASTO, podrías guardar la nota en una tabla de detalles si quisieras, 
+            // pero por ahora 'purchase_orders' ya tiene el monto y proveedor para el P&L.
+            // (Si tienes campo 'notes' en purchase_orders sería ideal actualizarlo)
+            // await client.from('purchase_orders').update({ notes: note }).eq('id', ord.id);
         }
-        alert("Compra Guardada."); window.location.reload();
+
+        alert("✅ Comprobante registrado exitosamente.");
+        window.location.reload();
+    }
+
+    // --- HISTORIAL & PAGOS ---
+    function switchTab(v, btn) {
+        document.getElementById('view-new').style.display = v==='new'?'block':'none';
+        document.getElementById('view-hist').style.display = v==='hist'?'block':'none';
+        document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+        btn.classList.add('active');
+        if(v==='hist') loadHist();
     }
 
     async function loadHist() {
-        const { data } = await client.from('purchase_orders').select('*, suppliers(name)').order('created_at',{ascending:false}).limit(20);
-        document.getElementById('histList').innerHTML = (data||[]).map(o => `
-            <div class="data-card" style="background:#111; padding:15px; border-radius:8px; border:1px solid #333; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center;">
+        // Traemos Ordenes + Nombre Proveedor
+        const { data } = await client.from('purchase_orders')
+            .select('*, suppliers(name, category)')
+            .order('created_at', {ascending:false})
+            .limit(20);
+        
+        const c = document.getElementById('histList');
+        if(!data.length) { c.innerHTML = '<div class="empty-state">Sin movimientos.</div>'; return; }
+
+        c.innerHTML = data.map(o => {
+            const isPaid = o.status === 'paid';
+            const cat = o.suppliers?.category;
+            const badgeClass = cat === 'INSUMOS' ? 'bdg-stock' : 'bdg-gasto';
+            
+            return `
+            <div class="hist-card">
                 <div>
-                    <div style="font-weight:700; color:#fff;">${o.suppliers?.name}</div>
-                    <div style="font-size:11px; color:#666;">${o.created_at.split('T')[0]} • Vence: ${o.due_date}</div>
+                    <div style="font-weight:700; color:#fff;">${o.suppliers?.name} <span class="mode-badge ${badgeClass}" style="font-size:8px;">${cat}</span></div>
+                    <div style="font-size:11px; color:#666;">Fecha: ${o.created_at} • Vence: ${o.due_date||'-'}</div>
                 </div>
-                <div style="text-align:right">
-                    <div style="font-weight:900; color:#fff;">$${o.total_amount.toLocaleString()}</div>
-                    <div style="font-size:9px; color:${o.payment_status==='paid'?'#cdfb3e':'#e8372f'}">${o.payment_status?.toUpperCase()||'IMPAGO'}</div>
+                <div style="text-align:right;">
+                    <div style="font-size:16px; font-weight:700; color:#fff;">$${o.total_amount.toLocaleString()}</div>
+                    ${ isPaid 
+                        ? '<span style="color:var(--mc-accent-green); font-size:10px; font-weight:800;">PAGADO</span>'
+                        : `<button onclick="markPaid(${o.id})" style="background:#222; border:1px solid #444; color:#fff; padding:5px 10px; border-radius:4px; font-size:10px; cursor:pointer; margin-top:5px;">MARCAR PAGADO</button>`
+                    }
                 </div>
-            </div>`).join('');
+            </div>`;
+        }).join('');
+    }
+
+    async function markPaid(id) {
+        if(!confirm("¿Confirmar pago realizado?")) return;
+        await client.from('purchase_orders').update({ status: 'paid' }).eq('id', id);
+        loadHist();
     }
   </script>
 </body>
