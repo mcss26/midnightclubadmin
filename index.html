@@ -1,32 +1,154 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Midnight — Solicitudes</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Midnight Admin — ERP</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="admin-styles.css" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    .req-item { display:flex; gap:10px; margin-bottom:10px; }
-    .sku-sel { flex:1; }
-  </style>
 </head>
 <body>
-  <header class="admin-header">
-    <div class="admin-logo">MIDNIGHT<span style="color: #fff;">OPS</span> / PEDIDOS</div>
-    <button onclick="window.location.href='operativo-index.html'" class="btn-logout">VOLVER</button>
-  </header>
 
-  <div class="admin-container" style="max-width:600px;">
-    <div class="dash-card" style="height:auto; cursor:default;">
-        <h3>Nueva Solicitud de Reposición</h3>
-        <p style="color:#666; font-size:12px;">Esto enviará una alerta a Administración.</p>
-        
-        <div id="itemsList"></div>
-        <button onclick="addRow()" class="btn-refresh" style="width:100%; margin-top:10px;">+ AGREGAR PRODUCTO</button>
+  <div id="login-overlay">
+    <div class="login-box">
+      <h2 style="color:var(--mc-red); font-family:'Outfit'; margin:0 0 20px 0;">MIDNIGHT ERP</h2>
+      <input type="text" id="userInput" class="login-input" placeholder="USUARIO" autocomplete="off">
+      <input type="password" id="passInput" class="login-input" placeholder="CONTRASEÑA">
+      <div id="loginError" class="login-error">Credenciales inválidas</div>
+      <button id="btnLogin" class="btn-login">INGRESAR</button>
+    </div>
+  </div>
 
-        <textarea id="reqNote" class="modal-input" placeholder="Nota opcional (Ej: Urgente para el Sábado)" style="margin-top:20px;"></textarea>
+  <div id="main-content" style="display: none;">
+    <header class="admin-header">
+      <div class="admin-logo">MIDNIGHT<span style="color: var(--mc-red);">ERP</span></div>
+      <div style="display:flex; align-items:center; gap:15px;">
+          <span id="userDisplay" style="color:#666; font-size:11px; font-weight:700; text-transform:uppercase;"></span>
+          <button onclick="logout()" class="btn-logout">SALIR</button>
+      </div>
+    </header>
+
+    <div class="admin-container">
+      
+      <div id="sectionStaff" class="dashboard-section" style="display:none;">
+        <div class="section-label" style="color: #fff;">Operación Caja</div>
+        <div class="dashboard-grid">
+            <a href="staff-cierre.html" class="dash-card" style="border-color: #fff; background: #222;">
+                <div class="dash-icon">🔒</div>
+                <h3 class="dash-title">Declaración<br>de Caja</h3>
+                <div class="dash-desc">Ingreso Ciego de Valores</div>
+            </a>
+        </div>
+      </div>
+
+      <div id="sectionWeb" class="dashboard-section">
+        <div class="section-label lbl-web">CMS Web & Socios</div>
+        <div class="dashboard-grid">
+            <a href="admin-solicitudes.html" class="dash-card card-web">
+                <div class="dash-icon">👥</div><h3 class="dash-title">Solicitudes</h3>
+                <div id="count-pending" class="dash-stat" style="color:var(--mc-red); font-size:20px;">--</div>
+                <div class="dash-desc">Admisión de Socios</div>
+            </a>
+            <a href="admin-accesos.html" class="dash-card card-web">
+                <div class="dash-icon">🎟️</div><h3 class="dash-title">Accesos Web</h3>
+                <div id="count-active-tickets" class="dash-stat" style="font-size:20px;">--</div>
+                <div class="dash-desc">Configuración Tickets</div>
+            </a>
+            <a href="admin-carta.html" class="dash-card card-web">
+                <div class="dash-icon">🍹</div><h3 class="dash-title">Carta Pública</h3>
+                <div id="count-menu" class="dash-stat" style="font-size:20px;">--</div>
+                <div class="dash-desc">Precios Visibles</div>
+            </a>
+            <a href="admin-cumples.html" class="dash-card card-web">
+                <div class="dash-icon">🎂</div><h3 class="dash-title">Cumpleaños</h3>
+                <div id="count-birthdays" class="dash-stat" style="font-size:20px;">--</div>
+                <div class="dash-desc">Fidelización</div>
+            </a>
+        </div>
+      </div>
+
+      <div id="sectionERP" style="display:none;">
         
-        <button onclick="sendRequest()" class="btn-primary" style="width:100%; padding:15px; margin-top:10px;">ENVIAR SOLICITUD 🚀</button>
+        <div class="dashboard-section">
+            <div class="section-label lbl-master">1. Master Data</div>
+            <div class="dashboard-grid">
+                <a href="admin-skus.html" class="dash-card card-master">
+                    <div class="dash-icon">🏗️</div><h3 class="dash-title">Master SKUs</h3>
+                    <div class="dash-desc">Insumos & Sync GBol</div>
+                </a>
+                <a href="admin-recetas.html" class="dash-card card-master">
+                    <div class="dash-icon">⚗️</div><h3 class="dash-title">Recetario</h3>
+                    <div class="dash-desc">Ingeniería de Menú</div>
+                </a>
+                <a href="admin-cargos.html" class="dash-card card-master">
+                    <div class="dash-icon">👔</div><h3 class="dash-title">Cargos & Roles</h3> <div class="dash-desc">Estructura RRHH</div>
+                </a>
+                <a href="admin-pos.html" class="dash-card card-master">
+                    <div class="dash-icon">🔗</div><h3 class="dash-title">Mapeo POS</h3>
+                    <div class="dash-desc">Conexión GBol/Zoco</div>
+                </a>
+                <a href="admin-proveedores.html" class="dash-card card-master">
+                    <div class="dash-icon">🚚</div><h3 class="dash-title">Proveedores</h3><div class="dash-desc">Directorio</div>
+                </a>
+                <a href="admin-logs.html" class="dash-card card-master">
+                    <div class="dash-icon">🛡️</div><h3 class="dash-title">Logs</h3><div class="dash-desc">Auditoría</div>
+                </a>
+            </div>
+        </div>
+
+        <div class="dashboard-section">
+            <div class="section-label lbl-daily">2. Operación Noche</div>
+            <div class="dashboard-grid">
+                
+                <a href="operativo-index.html" class="dash-card card-daily" style="background: linear-gradient(45deg, #222, #333); border-color: #fff; grid-column: span 2;">
+                    <div class="dash-icon">🚀</div>
+                    <h3 class="dash-title" style="font-size:18px;">OPERATIVO MIDNIGHT CLUB</h3>
+                    <div class="dash-desc">Dotación • Stock • Pedidos</div>
+                </a>
+
+                <a href="admin-stock-barras.html" id="btnStockBarras" class="dash-card card-daily">
+                    <div class="dash-icon">📊</div><h3 class="dash-title">Stock Barras</h3><div class="dash-desc">Aperturas y Conteos</div>
+                </a>
+                <a href="admin-cierre.html" class="dash-card card-daily">
+                    <div class="dash-icon">🌜</div><h3 class="dash-title">Cierre Noche</h3><div class="dash-desc">Cierre Ciego vs Sistema</div>
+                </a>
+                <a href="#" class="dash-card card-daily">
+                    <div class="dash-icon">📋</div><h3 class="dash-title">Bitácora</h3><div class="dash-desc">Novedades</div>
+                </a>
+            </div>
+        </div>
+
+        <div class="dashboard-section">
+            <div class="section-label lbl-weekly">3. Gestión Semanal</div>
+            <div class="dashboard-grid">
+                <a href="admin-arqueo.html" class="dash-card card-weekly">
+                    <div class="dash-icon">📑</div><h3 class="dash-title">Arqueo Semanal</h3><div class="dash-desc">Balance</div>
+                </a>
+                <a href="admin-compras.html" class="dash-card card-weekly">
+                    <div class="dash-icon">📦</div>
+                    <h3 class="dash-title">Ordenes de Pago</h3>
+                    <div class="dash-desc">Ingreso Facturas & Solicitudes</div>
+                </a>
+                <a href="admin-pagos.html" class="dash-card card-weekly">
+                    <div class="dash-icon">💸</div>
+                    <h3 class="dash-title">Calendario de Pagos</h3>
+                    <div class="dash-desc">Deuda y Vencimientos</div>
+                </a>
+            </div>
+        </div>
+
+        <div class="dashboard-section">
+            <div class="section-label lbl-monthly">4. Inteligencia Mensual</div>
+            <div class="dashboard-grid">
+                <a href="#" class="dash-card card-monthly">
+                    <div class="dash-icon">📈</div><h3 class="dash-title">Reporte P&L</h3><div class="dash-desc">Rentabilidad</div>
+                </a>
+            </div>
+        </div>
+
+      </div>
     </div>
   </div>
 
@@ -34,65 +156,94 @@
     const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    const user = localStorage.getItem('mc_admin_user');
 
-    let skus = [];
+    document.addEventListener('DOMContentLoaded', () => {
+        const u = localStorage.getItem('mc_admin_user');
+        const r = localStorage.getItem('mc_admin_role');
+        if (u && r) initSession(u, r);
+    });
 
-    window.onload = async () => {
-        const { data } = await client.from('inventory_skus').select('id,name').eq('is_active',true).order('name');
-        skus = data || [];
-        addRow();
-    };
+    async function doLogin() {
+        const u = document.getElementById('userInput').value.trim();
+        const p = document.getElementById('passInput').value.trim();
+        const btn = document.getElementById('btnLogin');
+        btn.innerText = "..."; 
+        const { data } = await client.from('admins').select('*').eq('username', u).eq('password', p).single();
+        if (data) {
+            localStorage.setItem('mc_admin_user', data.username);
+            localStorage.setItem('mc_admin_role', data.role);
+            await client.from('admin_logs').insert({ admin_name: data.username, action: 'LOGIN', details: `Rol: ${data.role}` });
+            initSession(data.username, data.role);
+        } else {
+            btn.innerText = "INGRESAR";
+            document.getElementById('loginError').style.display = 'block';
+        }
+    }
+    document.getElementById('btnLogin').addEventListener('click', doLogin);
+    document.getElementById('passInput').addEventListener('keydown', (e)=>{if(e.key==='Enter')doLogin()});
 
-    function addRow() {
-        const div = document.createElement('div'); div.className = 'req-item';
-        div.innerHTML = `
-            <select class="modal-select sku-sel" style="margin:0;">
-                <option value="">Producto...</option>
-                ${skus.map(s => `<option value="${s.id}">${s.name}</option>`).join('')}
-            </select>
-            <input type="number" class="modal-input qty-inp" placeholder="Cant" style="width:80px; margin:0;">
-            <button onclick="this.parentElement.remove()" style="border:none; background:none; color:#666;">✕</button>
-        `;
-        document.getElementById('itemsList').appendChild(div);
+    function initSession(user, role) {
+        document.getElementById('login-overlay').style.display = 'none';
+        document.getElementById('main-content').style.display = 'block';
+        document.getElementById('userDisplay').innerText = `${user} [${role.toUpperCase()}]`;
+
+        document.getElementById('sectionStaff').style.display = 'none';
+        document.getElementById('sectionWeb').style.display = 'none';
+        document.getElementById('sectionERP').style.display = 'none';
+
+        if (role === 'staff') {
+            document.getElementById('sectionStaff').style.display = 'block';
+
+        } else if (role === 'bar_manager') {
+            const erp = document.getElementById('sectionERP');
+            erp.style.display = 'block';
+            erp.querySelectorAll('.dash-card').forEach(c => c.style.display = 'none');
+            erp.querySelectorAll('.section-label').forEach(l => l.style.display = 'none');
+            
+            const btn = document.getElementById('btnStockBarras');
+            if(btn) {
+                btn.style.display = 'flex';
+                btn.parentElement.style.display = 'grid'; 
+                if(!document.getElementById('lbl-barra-temp')) {
+                    const t = document.createElement('div');
+                    t.id = 'lbl-barra-temp'; t.className = 'section-label'; t.innerText = 'OPERACIÓN DE BARRAS';
+                    btn.parentElement.parentElement.prepend(t);
+                }
+            }
+
+        } else if (role === 'superadmin') {
+            document.getElementById('sectionWeb').style.display = 'block';
+            document.getElementById('sectionERP').style.display = 'block';
+            document.getElementById('sectionStaff').style.display = 'block';
+            document.querySelectorAll('.dash-card').forEach(c => c.style.display = 'flex');
+            document.querySelectorAll('.section-label').forEach(l => l.style.display = 'block');
+            const tmp = document.getElementById('lbl-barra-temp'); if(tmp) tmp.remove();
+
+        } else {
+            document.getElementById('sectionWeb').style.display = 'block';
+        }
+
+        if(role !== 'staff' && role !== 'bar_manager') loadCounts();
     }
 
-    async function sendRequest() {
-        const rows = document.querySelectorAll('.req-item');
-        const items = [];
-        
-        rows.forEach(r => {
-            const sku = r.querySelector('.sku-sel').value;
-            const qty = r.querySelector('.qty-inp').value;
-            if(sku && qty) items.push({ sku_id: sku, quantity_ordered: qty, unit_cost: 0 }); 
-        });
+    function logout() { localStorage.clear(); window.location.reload(); }
 
-        if(!items.length) return alert("Agrega al menos un producto.");
-
-        // Crear Orden en estado 'requested' (Pendiente de Aprobación/Compra)
-        // Usamos un proveedor genérico o NULL si la base lo permite. 
-        // TRUCO: Si la DB exige supplier_id, deberíamos tener un proveedor "GENERICO INTERNO" o dejarlo null si tu schema lo permite. 
-        // Asumiré que permite NULL o que usarás un ID existente temporalmente.
-        // Si falla, crea un proveedor "STOCK INTERNO".
-
-        const note = `SOLICITUD OPS (${user}): ` + document.getElementById('reqNote').value;
-
-        const { data: ord, error } = await client.from('purchase_orders').insert({
-            status: 'requested', // ESTADO CLAVE
-            created_at: new Date(),
-            total_amount: 0, // Se define cuando Admin compre
-            supplier_id: null, // Admin definirá a quién comprarle
-            // Podríamos guardar la nota en un campo notes si agregaste la columna a purchase_orders
-        }).select().single();
-
-        if(error) return alert("Error: " + error.message);
-
-        // Guardar items
-        const itemsPayload = items.map(i => ({ ...i, order_id: ord.id }));
-        await client.from('purchase_items').insert(itemsPayload);
-
-        alert("✅ Solicitud enviada a Administración.");
-        window.location.reload();
+    async function loadCounts() {
+        try {
+            const { count: pend } = await client.from('members').select('*', {count:'exact',head:true}).eq('status','pendiente');
+            document.getElementById('count-pending').textContent = pend || '0';
+            const { count: tix } = await client.from('site_config').select('*', {count:'exact',head:true}).eq('is_active',true).or('key.eq.access_0000,key.eq.access_plus');
+            document.getElementById('count-active-tickets').textContent = tix || '0';
+            const { count: menu } = await client.from('menu_items').select('*', {count:'exact',head:true}).eq('is_active',true);
+            document.getElementById('count-menu').textContent = menu || '0';
+            
+            // Calculo simple de cumples
+            const { data: members } = await client.from('members').select('nacimiento').eq('status','activo');
+            if (members) {
+                 // (Lógica de cumples resumida)
+                 document.getElementById('count-birthdays').textContent = '-';
+            }
+        } catch(e) {}
     }
   </script>
 </body>
