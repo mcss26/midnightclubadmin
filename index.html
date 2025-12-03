@@ -72,8 +72,15 @@
       <div id="sectionERP" style="display:none;">
         
         <div class="dashboard-section">
-            <div class="section-label lbl-master">1. Master Data</div>
+            <div class="section-label lbl-master">1. Master Data & Admin</div>
             <div class="dashboard-grid">
+                
+                <a href="admin-panel.html" class="dash-card card-master" style="background: linear-gradient(45deg, #111, #333); border-color:#FFD700; grid-column:span 2;">
+                    <div class="dash-icon">💼</div>
+                    <h3 class="dash-title" style="color:#FFD700;">ADMINISTRACIÓN MIDNIGHT</h3>
+                    <div class="dash-desc">Depósito • Compras • Contabilidad</div>
+                </a>
+
                 <a href="admin-skus.html" class="dash-card card-master">
                     <div class="dash-icon">🏗️</div><h3 class="dash-title">Master SKUs</h3>
                     <div class="dash-desc">Insumos & Sync GBol</div>
@@ -83,7 +90,8 @@
                     <div class="dash-desc">Ingeniería de Menú</div>
                 </a>
                 <a href="admin-cargos.html" class="dash-card card-master">
-                    <div class="dash-icon">👔</div><h3 class="dash-title">Cargos & Roles</h3> <div class="dash-desc">Estructura RRHH</div>
+                    <div class="dash-icon">👔</div><h3 class="dash-title">Cargos & Roles</h3>
+                    <div class="dash-desc">Estructura RRHH</div>
                 </a>
                 <a href="admin-pos.html" class="dash-card card-master">
                     <div class="dash-icon">🔗</div><h3 class="dash-title">Mapeo POS</h3>
@@ -124,7 +132,7 @@
             <div class="section-label lbl-weekly">3. Gestión Semanal</div>
             <div class="dashboard-grid">
                 <a href="admin-arqueo.html" class="dash-card card-weekly">
-                    <div class="dash-icon">📑</div><h3 class="dash-title">Arqueo Semanal</h3><div class="dash-desc">Balance</div>
+                    <div class="dash-icon">📑</div><h3 class="dash-title">Arqueo Semanal</h3><div class="dash-desc">Balance Caja Fuerte</div>
                 </a>
                 <a href="admin-compras.html" class="dash-card card-weekly">
                     <div class="dash-icon">📦</div>
@@ -136,6 +144,10 @@
                     <h3 class="dash-title">Calendario de Pagos</h3>
                     <div class="dash-desc">Deuda y Vencimientos</div>
                 </a>
+                <a href="admin-rrhh.html" class="dash-card card-weekly">
+                    <div class="dash-icon">👷</div><h3 class="dash-title">Liquidación Sueldos</h3>
+                    <div class="dash-desc">Firmas y Pagos</div>
+                </a>
             </div>
         </div>
 
@@ -143,7 +155,7 @@
             <div class="section-label lbl-monthly">4. Inteligencia Mensual</div>
             <div class="dashboard-grid">
                 <a href="#" class="dash-card card-monthly">
-                    <div class="dash-icon">📈</div><h3 class="dash-title">Reporte P&L</h3><div class="dash-desc">Rentabilidad</div>
+                    <div class="dash-icon">📈</div><h3 class="dash-title">Reporte P&L</h3><div class="dash-desc">Rentabilidad (Próximamente)</div>
                 </a>
             </div>
         </div>
@@ -187,19 +199,25 @@
         document.getElementById('main-content').style.display = 'block';
         document.getElementById('userDisplay').innerText = `${user} [${role.toUpperCase()}]`;
 
+        // Reset inicial
         document.getElementById('sectionStaff').style.display = 'none';
         document.getElementById('sectionWeb').style.display = 'none';
         document.getElementById('sectionERP').style.display = 'none';
 
         if (role === 'staff') {
+            // ROL CAJERA
             document.getElementById('sectionStaff').style.display = 'block';
 
         } else if (role === 'bar_manager') {
+            // ROL JEFE DE BARRA (Vista Limitada)
             const erp = document.getElementById('sectionERP');
             erp.style.display = 'block';
+            
+            // Ocultar todo el ruido
             erp.querySelectorAll('.dash-card').forEach(c => c.style.display = 'none');
             erp.querySelectorAll('.section-label').forEach(l => l.style.display = 'none');
             
+            // Mostrar solo botón Stock
             const btn = document.getElementById('btnStockBarras');
             if(btn) {
                 btn.style.display = 'flex';
@@ -211,15 +229,19 @@
                 }
             }
 
-        } else if (role === 'superadmin') {
+        } else if (role === 'superadmin' || role === 'admin') {
+            // ROL GERENCIA GENERAL Y ADMIN (Acceso Total)
             document.getElementById('sectionWeb').style.display = 'block';
             document.getElementById('sectionERP').style.display = 'block';
             document.getElementById('sectionStaff').style.display = 'block';
+            
+            // Restaurar visibilidad
             document.querySelectorAll('.dash-card').forEach(c => c.style.display = 'flex');
             document.querySelectorAll('.section-label').forEach(l => l.style.display = 'block');
             const tmp = document.getElementById('lbl-barra-temp'); if(tmp) tmp.remove();
 
         } else {
+            // OTROS ROLES (Solo Web/RRPP)
             document.getElementById('sectionWeb').style.display = 'block';
         }
 
@@ -230,18 +252,44 @@
 
     async function loadCounts() {
         try {
+            // Solicitudes
             const { count: pend } = await client.from('members').select('*', {count:'exact',head:true}).eq('status','pendiente');
             document.getElementById('count-pending').textContent = pend || '0';
+            
+            // Tickets
             const { count: tix } = await client.from('site_config').select('*', {count:'exact',head:true}).eq('is_active',true).or('key.eq.access_0000,key.eq.access_plus');
             document.getElementById('count-active-tickets').textContent = tix || '0';
+            
+            // Carta
             const { count: menu } = await client.from('menu_items').select('*', {count:'exact',head:true}).eq('is_active',true);
             document.getElementById('count-menu').textContent = menu || '0';
-            
-            // Calculo simple de cumples
+
+            // Cumpleaños
             const { data: members } = await client.from('members').select('nacimiento').eq('status','activo');
             if (members) {
-                 // (Lógica de cumples resumida)
-                 document.getElementById('count-birthdays').textContent = '-';
+                const today = new Date();
+                const currentDay = today.getDay();
+                const dayAdjusted = currentDay === 0 ? 7 : currentDay; 
+                const monday = new Date(today); monday.setDate(today.getDate() - (dayAdjusted - 1)); monday.setHours(0,0,0,0);
+                const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); sunday.setHours(23,59,59,999);
+                
+                let bdayCount = 0;
+                members.forEach(m => {
+                    if (!m.nacimiento || m.nacimiento.length < 5) return;
+                    let bMonth, bDay;
+                    if (m.nacimiento.includes('-')) { 
+                        const p = m.nacimiento.split('-'); 
+                        if(p[0].length===4) { bMonth=parseInt(p[1])-1; bDay=parseInt(p[2]); } 
+                        else { bMonth=parseInt(p[1])-1; bDay=parseInt(p[0]); } 
+                    } else if (m.nacimiento.includes('/')) { 
+                        const p = m.nacimiento.split('/'); 
+                        bMonth=parseInt(p[1])-1; bDay=parseInt(p[0]); 
+                    } else return;
+
+                    const bdayThisYear = new Date(today.getFullYear(), bMonth, bDay);
+                    if (bdayThisYear >= monday && bdayThisYear <= sunday) bdayCount++;
+                });
+                document.getElementById('count-birthdays').textContent = bdayCount;
             }
         } catch(e) {}
     }
