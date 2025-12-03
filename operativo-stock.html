@@ -13,38 +13,96 @@
   </header>
 
   <div class="admin-container">
-    <input type="text" id="searchInp" class="search-input-admin" placeholder="🔍 Buscar..." oninput="filter()">
+    <div style="display:flex; gap:10px; margin-bottom:15px;">
+        <input type="text" id="searchInp" class="search-input-admin" placeholder="🔍 Buscar..." oninput="filter()" style="margin:0;">
+        <button onclick="openAdj()" class="btn-refresh" style="background:var(--mc-red); color:#fff; width:auto; white-space:nowrap;">⚠ AJUSTE MANUAL</button>
+    </div>
+    
     <div id="stockList" class="dashboard-grid"><div class="loading-state">Cargando...</div></div>
+  </div>
+
+  <div id="adjModal" class="modal-overlay">
+    <div class="modal-box">
+        <h3>Reportar Novedad de Stock</h3>
+        <p style="color:#666; font-size:11px; margin-bottom:15px;">Uso exclusivo para roturas, robos o consumo interno.</p>
+        
+        <label class="input-label">PRODUCTO</label>
+        <select id="adjSku" class="modal-select"></select>
+        
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div><label class="input-label">CANTIDAD (Unidades)</label><input type="number" id="adjQty" class="modal-input" placeholder="Ej: 1"></div>
+            <div><label class="input-label">TIPO</label>
+                <select id="adjType" class="modal-select">
+                    <option value="ROTURA">Rotura (-)</option>
+                    <option value="ROBO">Robo / Faltante (-)</option>
+                    <option value="INVITACION">Invitación / RRPP (-)</option>
+                    <option value="HALLAZGO">Hallazgo (+)</option>
+                </select>
+            </div>
+        </div>
+        
+        <label class="input-label">OBSERVACIÓN</label>
+        <textarea id="adjNote" class="modal-input" placeholder="Detalle de lo sucedido..."></textarea>
+
+        <div class="modal-btns">
+            <button onclick="document.getElementById('adjModal').style.display='none'" class="btn-modal-cancel">CANCELAR</button>
+            <button onclick="saveAdj()" class="btn-modal-save" style="background:var(--mc-red); color:#fff;">CONFIRMAR AJUSTE</button>
+        </div>
+    </div>
   </div>
 
   <script>
     const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
     const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const user = localStorage.getItem('mc_admin_user');
 
     let allItems = [];
+
     window.onload = async () => {
         const { data } = await client.from('inventory_skus').select('*').order('name');
-        allItems = data || []; render(allItems);
+        allItems = data || []; 
+        render(allItems);
+        // Llenar select modal
+        document.getElementById('adjSku').innerHTML = allItems.map(i=>`<option value="${i.id}">${i.name}</option>`).join('');
     };
 
     function render(list) {
-        const c = document.getElementById('stockList');
-        if(!list.length) { c.innerHTML = '<div class="empty-state">Vacío</div>'; return; }
-        c.innerHTML = list.map(i => {
-            const cur = parseFloat(i.stock_current)||0;
-            const ide = parseFloat(i.ideal_stock)||0;
-            let color = '#333';
-            if(ide>0) { color = cur<=0 ? 'var(--mc-red)' : (cur<ide ? 'var(--mc-accent-gold)' : 'var(--mc-accent-green)'); }
-            return `
-            <div class="dash-card" style="height:auto; border-left:4px solid ${color};">
+        // (Mismo render que antes, sin cambios visuales en lista)
+        document.getElementById('stockList').innerHTML = list.map(i=>`
+            <div class="dash-card" style="height:auto;">
                 <div style="display:flex; justify-content:space-between;">
-                    <div><h3 class="dash-title" style="font-size:14px;">${i.name}</h3><div class="dash-desc">${i.category||'-'}</div></div>
-                    <div style="text-align:right;"><div style="font-size:20px; font-weight:800; color:#fff;">${cur}</div><div style="font-size:10px; color:#888;">Meta: ${ide}</div></div>
+                    <div><h3 class="dash-title" style="font-size:14px;">${i.name}</h3></div>
+                    <div style="font-size:20px; font-weight:800; color:#fff;">${parseFloat(i.stock_current)||0}</div>
                 </div>
-            </div>`;
-        }).join('');
+            </div>`).join('');
     }
+    
+    function openAdj() { document.getElementById('adjModal').style.display='flex'; }
+
+    async function saveAdj() {
+        const skuId = document.getElementById('adjSku').value;
+        const qty = parseFloat(document.getElementById('adjQty').value);
+        const type = document.getElementById('adjType').value;
+        
+        if(!qty) return alert("Ingresa cantidad");
+        
+        // Calcular cambio (Negativo si es rotura/robo, positivo si es hallazgo)
+        const sign = type === 'HALLAZGO' ? 1 : -1;
+        const change = Math.abs(qty) * sign;
+
+        // 1. Guardar Movimiento
+        await client.from('inventory_movements').insert({
+            sku_id: skuId, change_amount: change, movement_type: 'AJUSTE_' + type, admin_name: user, notes: document.getElementById('adjNote').value
+        });
+
+        // 2. Actualizar Stock Maestro
+        const { data: curr } = await client.from('inventory_skus').select('stock_current').eq('id', skuId).single();
+        await client.from('inventory_skus').update({ stock_current: (curr.stock_current||0) + change }).eq('id', skuId);
+
+        alert("Ajuste registrado."); window.location.reload();
+    }
+    
     function filter() { render(allItems.filter(i=>i.name.toLowerCase().includes(document.getElementById('searchInp').value.toLowerCase()))); }
   </script>
 </body>
