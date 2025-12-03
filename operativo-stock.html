@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Midnight Ops — Stock</title>
+  <link rel="stylesheet" href="admin-styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="admin-header">
+    <div class="admin-logo">MIDNIGHT<span style="color: #fff;">OPS</span> / STOCK</div>
+    <button onclick="window.location.href='operativo-index.html'" class="btn-logout">VOLVER</button>
+  </header>
+
+  <div class="admin-container">
+    <input type="text" id="searchInp" class="search-input-admin" placeholder="🔍 Buscar..." oninput="filter()">
+    <div id="stockList" class="dashboard-grid"><div class="loading-state">Cargando...</div></div>
+  </div>
+
+  <script>
+    const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    let allItems = [];
+    window.onload = async () => {
+        const { data } = await client.from('inventory_skus').select('*').order('name');
+        allItems = data || []; render(allItems);
+    };
+
+    function render(list) {
+        const c = document.getElementById('stockList');
+        if(!list.length) { c.innerHTML = '<div class="empty-state">Vacío</div>'; return; }
+        c.innerHTML = list.map(i => {
+            const cur = parseFloat(i.stock_current)||0;
+            const ide = parseFloat(i.ideal_stock)||0;
+            let color = '#333';
+            if(ide>0) { color = cur<=0 ? 'var(--mc-red)' : (cur<ide ? 'var(--mc-accent-gold)' : 'var(--mc-accent-green)'); }
+            return `
+            <div class="dash-card" style="height:auto; border-left:4px solid ${color};">
+                <div style="display:flex; justify-content:space-between;">
+                    <div><h3 class="dash-title" style="font-size:14px;">${i.name}</h3><div class="dash-desc">${i.category||'-'}</div></div>
+                    <div style="text-align:right;"><div style="font-size:20px; font-weight:800; color:#fff;">${cur}</div><div style="font-size:10px; color:#888;">Meta: ${ide}</div></div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+    function filter() { render(allItems.filter(i=>i.name.toLowerCase().includes(document.getElementById('searchInp').value.toLowerCase()))); }
+  </script>
+</body>
+</html>

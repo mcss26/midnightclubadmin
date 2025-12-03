@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Midnight — Pedidos</title>
+  <link rel="stylesheet" href="admin-styles.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+  <header class="admin-header">
+    <div class="admin-logo">MIDNIGHT<span style="color: #fff;">OPS</span> / PEDIDOS</div>
+    <button onclick="window.location.href='operativo-index.html'" class="btn-logout">VOLVER</button>
+  </header>
+  <div class="admin-container" style="max-width:600px;">
+    <div class="dash-card" style="height:auto; cursor:default;">
+        <h3>Solicitud Reposición</h3>
+        <div id="itemsList"></div>
+        <button onclick="addRow()" class="btn-refresh" style="width:100%; margin-top:10px;">+ AGREGAR</button>
+        <textarea id="reqNote" class="modal-input" placeholder="Nota opcional..." style="margin-top:20px;"></textarea>
+        <button onclick="send()" class="btn-primary" style="width:100%; padding:15px; margin-top:10px;">ENVIAR 🚀</button>
+    </div>
+  </div>
+  <script>
+    const SUPABASE_URL = 'https://yxmbrqeamwfthmatujvq.supabase.co';
+    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl4bWJycWVhbXdmdGhtYXR1anZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4NzE0ODIsImV4cCI6MjA3OTQ0NzQ4Mn0.QVb2c-awM1G2G4m_ZlJD4-5LrZyqd_CDkQeCH1Xg258';
+    const client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    const user = localStorage.getItem('mc_admin_user');
+    let skus = [];
+
+    window.onload = async () => {
+        const { data } = await client.from('inventory_skus').select('id,name').eq('is_active',true).order('name');
+        skus = data || []; addRow();
+    };
+
+    function addRow() {
+        const d = document.createElement('div'); d.className='req-item'; d.style.display='flex'; d.style.gap='10px'; d.style.marginBottom='10px';
+        d.innerHTML = `<select class="modal-select sku-sel" style="margin:0;"><option value="">Producto...</option>${skus.map(s=>`<option value="${s.id}">${s.name}</option>`).join('')}</select><input type="number" class="modal-input qty-inp" placeholder="Cant" style="width:80px; margin:0;"><button onclick="this.parentElement.remove()" style="border:none; background:none; color:#666;">✕</button>`;
+        document.getElementById('itemsList').appendChild(d);
+    }
+
+    async function send() {
+        const items = [];
+        document.querySelectorAll('.req-item').forEach(r => {
+            const s=r.querySelector('.sku-sel').value, q=r.querySelector('.qty-inp').value;
+            if(s&&q) items.push({sku_id:s, quantity_ordered:q, unit_cost:0});
+        });
+        if(!items.length) return alert("Agrega productos.");
+        
+        const { data: ord, error } = await client.from('purchase_orders').insert({ status:'requested', created_at:new Date(), total_amount:0 }).select().single();
+        if(error) return alert(error.message);
+        await client.from('purchase_items').insert(items.map(i=>({...i, order_id:ord.id})));
+        alert("Solicitud enviada."); window.location.reload();
+    }
+  </script>
+</body>
+</html>
