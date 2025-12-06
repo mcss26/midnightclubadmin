@@ -14,6 +14,10 @@
   --radius-md: 8px;
   --radius-lg: 12px;
   --shadow-soft: 0 8px 30px rgba(0, 0, 0, 0.45);
+  --mc-bg-gradient: linear-gradient(180deg, #050505 0%, #07070a 40%, #071117 100%);
+  --mc-panel-bg: rgba(17, 17, 17, 0.8);
+  --mc-card-shadow: 0 18px 40px rgba(0, 0, 0, 0.7);
+  --mc-transition: 0.3s ease;
 }
 
 /* Reset básico */
@@ -26,10 +30,12 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: var(--mc-bg);
+  background: var(--mc-bg-gradient);
+  background-attachment: fixed;
   color: var(--mc-text);
   font-family: var(--font-main);
   -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
 }
 
 a {
@@ -43,6 +49,8 @@ a:hover {
 
 button {
   font-family: inherit;
+  transition: border-color var(--mc-transition), background var(--mc-transition), color var(--mc-transition),
+    transform var(--mc-transition);
 }
 
 /* HEADER & LAYOUT */
@@ -87,6 +95,11 @@ button {
   max-width: 1200px;
   margin: 0 auto;
   padding: 20px;
+  background: var(--mc-panel-bg);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: var(--mc-card-shadow);
+  backdrop-filter: blur(20px);
 }
 
 /* SECCIONES */
@@ -156,6 +169,8 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  transition: background var(--mc-transition), border-color var(--mc-transition), color var(--mc-transition),
+    transform var(--mc-transition);
 }
 
 .btn-refresh:hover,
@@ -164,6 +179,7 @@ button {
 .btn-danger:hover,
 .btn-action:hover {
   border-color: #ffffff;
+  transform: translateY(-1px);
 }
 
 .btn-primary {
@@ -265,11 +281,17 @@ button {
   border-radius: var(--radius-lg);
   border: 1px solid var(--mc-border);
   padding: 16px 18px;
-  box-shadow: var(--shadow-soft);
   display: flex;
   flex-direction: column;
   justify-content: space-between;
   min-height: 140px;
+  transition: transform var(--mc-transition), box-shadow var(--mc-transition);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.55);
+}
+
+.dash-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 24px 45px rgba(0, 0, 0, 0.65);
 }
 
 .dash-title {
@@ -319,6 +341,7 @@ button {
   color: #ffffff;
   font-size: 13px;
   outline: none;
+  transition: border-color var(--mc-transition), box-shadow var(--mc-transition), background var(--mc-transition);
 }
 
 .search-input-admin::placeholder {
@@ -327,6 +350,7 @@ button {
 
 .search-input-admin:focus {
   border-color: var(--mc-red);
+  box-shadow: 0 0 16px rgba(232, 55, 47, 0.35);
 }
 
 /* FILTROS / CHIPS (solicitudes + carta) */
@@ -351,12 +375,19 @@ button {
   letter-spacing: 0.12em;
   cursor: pointer;
   white-space: nowrap;
+  transition: background var(--mc-transition), border-color var(--mc-transition), color var(--mc-transition),
+    transform var(--mc-transition);
 }
 
 .filter-chip.active {
   background-color: var(--mc-red);
   border-color: var(--mc-red);
   color: #ffffff;
+}
+
+.filter-chip:not(.active):hover {
+  transform: translateY(-1px);
+  border-color: #555555;
 }
 
 /* SOLICITUDES / MEMBERS */
@@ -381,10 +412,16 @@ button {
   padding: 8px 10px;
   font-size: 13px;
   outline: none;
+  transition: border-color var(--mc-transition), box-shadow var(--mc-transition);
 }
 
 .insta-input::placeholder {
   color: #555555;
+}
+
+.insta-input:focus {
+  border-color: var(--mc-red);
+  box-shadow: 0 0 14px rgba(232, 55, 47, 0.3);
 }
 
 .request-list {
@@ -394,7 +431,7 @@ button {
 }
 
 .request-card {
-  background-color: #111111;
+  background-color: #0f0f11;
   border-radius: var(--radius-md);
   border: 1px solid #222222;
   padding: 12px 14px;
@@ -402,6 +439,14 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  transition: border-color var(--mc-transition), box-shadow var(--mc-transition), transform var(--mc-transition);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+}
+
+.request-card:hover {
+  border-color: #444444;
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
 }
 
 .req-index {
@@ -504,10 +549,12 @@ button {
   font-family: monospace;
   font-size: 12px;
   outline: none;
+  transition: border-color var(--mc-transition), box-shadow var(--mc-transition);
 }
 
 .config-input:focus {
   border-color: var(--mc-accent-blue);
+  box-shadow: 0 0 14px rgba(0, 234, 255, 0.35);
 }
 
 /* SWITCH */
@@ -583,6 +630,14 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  transition: transform var(--mc-transition), box-shadow var(--mc-transition), border-color var(--mc-transition);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55);
+}
+
+.menu-item-card:hover {
+  transform: translateY(-2px);
+  border-color: #555555;
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.6);
 }
 
 .item-header {
@@ -646,7 +701,14 @@ button {
   border-radius: var(--radius-lg);
   border: 1px solid #333333;
   padding: 20px 22px;
-  box-shadow: var(--shadow-soft);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+  transition: transform var(--mc-transition), box-shadow var(--mc-transition);
+  transform: translateY(-6px);
+  backdrop-filter: blur(32px);
+}
+
+.modal-overlay.is-open .modal-box {
+  transform: translateY(0);
 }
 
 .modal-title {

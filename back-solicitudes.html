@@ -13,6 +13,45 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
   <script src="back-config.js"></script>
+
+  <style>
+    .insta-toolbar {
+      background: var(--mc-card-bg);
+      border: 1px solid var(--mc-border);
+      padding: 15px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+    }
+    .insta-input {
+      background: #000;
+      border: 1px solid #444;
+      color: #fff;
+      padding: 8px;
+      width: 60px;
+      text-align: center;
+      font-weight: 700;
+      border-radius: 4px;
+    }
+    .btn-bulk {
+      background: #fff;
+      color: #000;
+      border: none;
+      padding: 8px 15px;
+      font-weight: 800;
+      cursor: pointer;
+      font-size: 11px;
+      border-radius: 4px;
+      flex: 1;
+      text-transform: uppercase;
+      transition: opacity 0.2s;
+    }
+    .btn-bulk:hover {
+      opacity: 0.85;
+    }
+  </style>
 </head>
 <body>
   <header class="admin-header">
@@ -31,9 +70,17 @@
         <button class="btn-refresh" onclick="loadRequests()">REFRESCAR</button>
       </div>
 
-      <p class="section-subtitle" id="summaryCounts">
-        Pendientes: -- · Activos: -- · Rechazados: --
-      </p>
+      <p class="section-subtitle" id="summaryCounts">Pendientes: -- · Activos: -- · Rechazados: --</p>
+
+      <!-- Toolbar Instagram -->
+      <div class="insta-toolbar">
+        <span style="font-size:11px;font-weight:700;color:#aaa;text-transform:uppercase;">
+          Abrir Instagrams:
+        </span>
+        <input type="number" id="instaFrom" class="insta-input" placeholder="DE" min="1">
+        <input type="number" id="instaTo" class="insta-input" placeholder="A" min="1">
+        <button onclick="openBulkInstagrams()" class="btn-bulk">Abrir ↗</button>
+      </div>
 
       <div class="search-bar-container">
         <input
@@ -67,7 +114,7 @@
     let currentFilter = 'pendiente';
 
     document.addEventListener('DOMContentLoaded', () => {
-      // Auth básica: si no hay admin en storage, vuelvo al index/login
+      // Auth básica
       try {
         const saved = localStorage.getItem(STORAGE_KEY);
         if (!saved) {
@@ -79,7 +126,8 @@
           window.location.href = 'index.html';
           return;
         }
-        document.getElementById('userDisplay').textContent = currentAdmin.username.toUpperCase();
+        document.getElementById('userDisplay').textContent =
+          currentAdmin.username.toUpperCase();
       } catch (e) {
         window.location.href = 'index.html';
         return;
@@ -100,7 +148,9 @@
       // Filtros
       document.querySelectorAll('.filter-chip').forEach(btn => {
         btn.addEventListener('click', () => {
-          document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+          document.querySelectorAll('.filter-chip').forEach(b =>
+            b.classList.remove('active')
+          );
           btn.classList.add('active');
           currentFilter = btn.getAttribute('data-status') || 'pendiente';
           renderList();
@@ -129,8 +179,7 @@
       return String(value || '')
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
+        .replace(/>/g, '&quot;')
         .replace(/'/g, '&#39;');
     }
 
@@ -203,14 +252,18 @@
       const listEl = document.getElementById('requestsList');
       if (!listEl) return;
 
-      const searchTerm = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+      const searchTerm = (document.getElementById('searchInput')?.value || '')
+        .toLowerCase()
+        .trim();
 
       let filtered = allMembers.slice();
 
       if (currentFilter === 'debug') {
         filtered = filtered.filter(m => hasCredsIssue(m));
       } else if (currentFilter !== 'all') {
-        filtered = filtered.filter(m => (m.status || '').toLowerCase() === currentFilter);
+        filtered = filtered.filter(
+          m => (m.status || '').toLowerCase() === currentFilter
+        );
       }
 
       if (searchTerm) {
@@ -227,7 +280,8 @@
       }
 
       if (filtered.length === 0) {
-        listEl.innerHTML = '<div class="empty-state">No hay solicitudes para este filtro.</div>';
+        listEl.innerHTML =
+          '<div class="empty-state">No hay solicitudes para este filtro.</div>';
         return;
       }
 
@@ -237,7 +291,15 @@
         if (st === 'activo') statusLabel = 'ACTIVO';
         if (st === 'rechazado') statusLabel = 'RECHAZADO';
 
-        const igText = m.instagram ? '@' + m.instagram.replace('@', '') : 'sin IG';
+        const igHandle = (m.instagram || '').replace('@', '').trim();
+        const igDisplay = igHandle ? '@' + igHandle : 'sin IG';
+        const igHtml = igHandle
+          ? `<a href="https://instagram.com/${encodeURIComponent(
+              igHandle
+            )}" target="_blank" class="req-detail" style="text-decoration:underline;">
+               ${escapeHTML(igDisplay)}
+             </a>`
+          : `<span class="req-detail">${escapeHTML(igDisplay)}</span>`;
 
         const credsIssue = hasCredsIssue(m);
 
@@ -247,12 +309,13 @@
                data-name="${escapeHTML(m.nombre || '')}"
                data-email="${escapeHTML(m.email || '')}"
                data-member-id="${escapeHTML(m.member_id || '')}"
-               data-status="${escapeHTML(st)}">
+               data-status="${escapeHTML(st)}"
+               data-instagram="${escapeHTML(m.instagram || '')}">
             <div class="req-index">${index + 1}</div>
             <div class="req-info">
               <h3>${escapeHTML(m.nombre || 'SIN NOMBRE')}</h3>
               <div>
-                <span class="req-detail">${igText}</span>
+                ${igHtml}
                 <span class="req-detail">${escapeHTML(m.email || '')}</span>
               </div>
               <div>
@@ -291,7 +354,8 @@
       const listEl = document.getElementById('requestsList');
 
       if (!btn) {
-        if (listEl) listEl.addEventListener('click', handleListClick, { once: true });
+        if (listEl)
+          listEl.addEventListener('click', handleListClick, { once: true });
         return;
       }
 
@@ -320,7 +384,8 @@
       } else if (action === 'reject') {
         confirmMsg = '¿Rechazar esta solicitud?';
       } else if (action === 'debug') {
-        confirmMsg = '¿Reenviar mail de aprobado (DEBUG) con credenciales actualizadas?';
+        confirmMsg =
+          '¿Reenviar mail de aprobado (DEBUG) con credenciales actualizadas?';
       } else {
         return;
       }
@@ -340,7 +405,12 @@
       if (action === 'approve') {
         newStatus = 'activo';
 
-        if (!memberId || memberId === 'null' || memberId === 'undefined' || memberId.length < 3) {
+        if (
+          !memberId ||
+          memberId === 'null' ||
+          memberId === 'undefined' ||
+          memberId.length < 3
+        ) {
           memberId = generateMemberId();
           update.member_id = memberId;
         }
@@ -356,13 +426,16 @@
       if (action === 'debug') {
         newStatus = 'activo';
 
-        // Si el member_id está vacío/mal, generamos uno nuevo
-        if (!memberId || memberId === 'null' || memberId === 'undefined' || memberId.length < 3) {
+        if (
+          !memberId ||
+          memberId === 'null' ||
+          memberId === 'undefined' ||
+          memberId.length < 3
+        ) {
           memberId = generateMemberId();
           update.member_id = memberId;
         }
 
-        // Siempre generamos password nuevo para dejar todo prolijo
         newPass = generatePassword();
         update.access_password = newPass;
       }
@@ -389,20 +462,27 @@
                 ? 'CMS_SOLICITUD_DEBUG'
                 : `CMS_SOLICITUD_${newStatus.toUpperCase()}`;
 
-            client.from('admin_logs').insert({
-              admin_name: currentAdmin.username,
-              action: logAction,
-              details: name
-            }).then();
+            client
+              .from('admin_logs')
+              .insert({
+                admin_name: currentAdmin.username,
+                action: logAction,
+                details: name
+              })
+              .then();
           }
         } catch (e) {
           console.warn('Error guardando log', e);
         }
 
         // Email en APROBAR y DEBUG
-        if ((action === 'approve' || action === 'debug') &&
-            email && email.includes('@') &&
-            memberId && newPass) {
+        if (
+          (action === 'approve' || action === 'debug') &&
+          email &&
+          email.includes('@') &&
+          memberId &&
+          newPass
+        ) {
           const params = {
             to_name: name || '',
             to_email: email,
@@ -417,12 +497,45 @@
           }
         }
 
-        // Recargar lista para reflejar cambios
         loadRequests();
       } catch (e) {
         console.error('processAction error', e);
         alert('Error al procesar la acción.');
       }
+    }
+
+    // Abrir varios Instagrams por rango (lista actual filtrada)
+    function openBulkInstagrams() {
+      const fromEl = document.getElementById('instaFrom');
+      const toEl = document.getElementById('instaTo');
+      if (!fromEl || !toEl) return;
+
+      const from = parseInt(fromEl.value, 10);
+      const to = parseInt(toEl.value, 10);
+
+      if (Number.isNaN(from) || Number.isNaN(to) || from < 1 || to < from) {
+        alert('Rango inválido (DE / A).');
+        return;
+      }
+
+      const cards = Array.from(
+        document.querySelectorAll('#requestsList .request-card')
+      );
+      if (!cards.length) return;
+
+      const maxTo = Math.min(to, cards.length);
+      const slice = cards.slice(from - 1, maxTo);
+
+      slice.forEach(card => {
+        const rawIg = (card.dataset.instagram || '').trim();
+        if (!rawIg) return;
+        const handle = rawIg.replace('@', '').trim();
+        if (!handle) return;
+        window.open(
+          `https://instagram.com/${encodeURIComponent(handle)}`,
+          '_blank'
+        );
+      });
     }
   </script>
 </body>
