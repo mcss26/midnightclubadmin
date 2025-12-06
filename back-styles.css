@@ -262,6 +262,25 @@ button {
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  transition: border-color var(--mc-transition), color var(--mc-transition), background var(--mc-transition);
+}
+
+.log-action-badge.status-badge.status-pendiente {
+  border-color: #fddd76;
+  color: #fcefb0;
+  background: rgba(253, 221, 118, 0.15);
+}
+
+.log-action-badge.status-badge.status-activo {
+  border-color: #8af47c;
+  color: #d6ffbc;
+  background: rgba(138, 244, 124, 0.1);
+}
+
+.log-action-badge.debug-badge {
+  border-color: var(--mc-red);
+  color: var(--mc-red);
+  background: rgba(232, 55, 47, 0.15);
 }
 
 /* DASHBOARD (index + cumples) */

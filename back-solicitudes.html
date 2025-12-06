@@ -290,6 +290,7 @@
         let statusLabel = 'PENDIENTE';
         if (st === 'activo') statusLabel = 'ACTIVO';
         if (st === 'rechazado') statusLabel = 'RECHAZADO';
+        const statusClass = `status-${st}`;
 
         const igHandle = (m.instagram || '').replace('@', '').trim();
         const igDisplay = igHandle ? '@' + igHandle : 'sin IG';
@@ -323,9 +324,9 @@
                 ${m.nacimiento ? `<span class="req-detail">Nac: ${escapeHTML(m.nacimiento)}</span>` : ''}
               </div>
               <div class="req-tags">
-                <span class="log-action-badge">${statusLabel}</span>
+                <span class="log-action-badge status-badge ${statusClass}">${statusLabel}</span>
                 ${m.member_id ? `<span class="log-action-badge">ID: ${escapeHTML(m.member_id)}</span>` : ''}
-                ${credsIssue ? `<span class="log-action-badge" style="border-color:#e8372f;color:#e8372f;">DEBUG</span>` : ''}
+                ${credsIssue ? `<span class="log-action-badge debug-badge">DEBUG</span>` : ''}
               </div>
             </div>
             <div class="item-actions">
