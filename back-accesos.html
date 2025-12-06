@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Midnight CMS — Accesos & Config</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="back-styles.css" />
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="back-config.js"></script>
+
+  <style>
+    .admin-container-single {
+      max-width: 600px;
+      margin: 40px auto;
+    }
+    .btn-back {
+      text-decoration: none;
+      color: #888;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-bottom: 20px;
+      font-weight: 600;
+    }
+    .btn-back:hover {
+      color: #fff;
+    }
+    .btn-save {
+      margin-top: 10px;
+    }
+    .help-text {
+      font-size: 11px;
+      color: var(--mc-text-muted);
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="admin-header">
+    <div class="admin-logo">ACCESOS</div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <a href="index.html" class="btn-ghost">PANEL</a>
+      <span id="userDisplay" style="color:#666;font-size:11px;font-weight:700;text-transform:uppercase;"></span>
+      <button onclick="logout()" class="btn-logout">SALIR</button>
+    </div>
+  </header>
+
+  <div class="admin-container admin-container-single">
+    <main>
+      <a href="index.html" class="btn-back">← Volver al Dashboard</a>
+
+      <div class="section-header">
+        <div class="section-title">Tickets & Accesos Públicos</div>
+      </div>
+      
+      <div id="config-list">
+        <div class="loading-state">Cargando configuración...</div>
+      </div>
+
+      <div class="section-header" style="margin-top:30px;">
+        <div class="section-title">Imagen de Portada (Hero)</div>
+      </div>
+
+      <div class="config-item">
+        <input
+          type="text"
+          id="heroImgInput"
+          class="config-input"
+          placeholder="URL de la imagen (https://...)"
+          autocomplete="off"
+        >
+        <button onclick="saveHeroImage()" class="btn-primary btn-save">GUARDAR IMAGEN</button>
+        <p class="help-text">Escribe "default" para restaurar la imagen original.</p>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'mid_cms_admin_v1';
+    let client = null;
+    let currentAdmin = null;
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Auth básica: si no hay admin logueado, vuelvo a index
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) {
+          window.location.href = 'index.html';
+          return;
+        }
+        currentAdmin = JSON.parse(saved);
+        if (!currentAdmin || !currentAdmin.username) {
+          window.location.href = 'index.html';
+          return;
+        }
+        document.getElementById('userDisplay').textContent = currentAdmin.username.toUpperCase();
+      } catch (e) {
+        window.location.href = 'index.html';
+        return;
+      }
+
+      try {
+        client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      } catch (e) {
+        console.error('Supabase init error', e);
+      }
+
+      loadConfig();
+      loadHeroImage();
+    });
+
+    function logout() {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (e) {}
+      window.location.href = 'index.html';
+    }
+
+    // --- 1. CONFIGURACIÓN DE TICKETS / ACCESOS ---
+    async function loadConfig() {
+      const container = document.getElementById('config-list');
+      if (!client) {
+        container.innerHTML = '<div class="empty-state">Error de conexión.</div>';
+        return;
+      }
+
+      const { data: configs, error } = await client
+        .from('site_config')
+        .select('*')
+        .order('key', { ascending: true });
+
+      if (error) {
+        console.error('Error Supabase:', error);
+        container.innerHTML = '<div class="empty-state">Error cargando configuración.</div>';
+        return;
+      }
+
+      let html = '';
+
+      (configs || []).forEach(conf => {
+        // Filtrar solo keys de accesos y members
+        if (conf.key.startsWith('access_') || conf.key.startsWith('mem_')) {
+          const label = conf.label || conf.key; // si no hay label, uso key
+          const urlVal = conf.url || '';
+
+          html += `
+            <div class="config-item">
+              <div class="config-header">
+                <span class="config-label">${escapeHTML(label)}</span>
+                <label class="switch">
+                  <input type="checkbox" ${conf.is_active ? 'checked' : ''} onchange="toggleConfig('${conf.key}', this.checked)">
+                  <span class="slider"></span>
+                </label>
+              </div>
+              <input
+                type="text"
+                class="config-input"
+                value="${escapeHTML(urlVal)}"
+                onchange="updateConfigUrl('${conf.key}', this.value)"
+                placeholder="Pegar URL de Passline aquí..."
+              >
+            </div>
+          `;
+        }
+      });
+
+      container.innerHTML = html || '<div class="empty-state">No hay configuraciones disponibles.</div>';
+    }
+
+    async function toggleConfig(key, isActive) {
+      if (!client) return;
+      try {
+        await client.from('site_config').update({ is_active: isActive }).eq('key', key);
+        console.log(`${key} ahora es ${isActive}`);
+      } catch (e) {
+        console.error('toggleConfig error', e);
+      }
+    }
+
+    async function updateConfigUrl(key, newUrl) {
+      if (!client) return;
+      try {
+        await client.from('site_config').update({ url: newUrl }).eq('key', key);
+        console.log(`URL de ${key} actualizada.`);
+      } catch (e) {
+        console.error('updateConfigUrl error', e);
+      }
+    }
+
+    // --- 2. IMAGEN HERO ---
+    async function loadHeroImage() {
+      if (!client) return;
+      try {
+        const { data, error } = await client
+          .from('site_config')
+          .select('value')
+          .eq('key', 'hero_image')
+          .single();
+
+        if (!error && data && typeof data.value === 'string') {
+          const input = document.getElementById('heroImgInput');
+          if (input) input.value = data.value;
+        }
+      } catch (e) {
+        console.error('loadHeroImage error', e);
+      }
+    }
+
+    async function saveHeroImage() {
+      if (!client) return;
+      const btn = document.querySelector('.btn-save');
+      const input = document.getElementById('heroImgInput');
+      if (!btn || !input) return;
+
+      const originalText = btn.textContent;
+      btn.textContent = 'GUARDANDO...';
+      btn.disabled = true;
+
+      const url = input.value.trim();
+      const finalUrl = (url === '' || url.toLowerCase() === 'default') ? 'default' : url;
+
+      try {
+        await client
+          .from('site_config')
+          .update({ value: finalUrl })
+          .eq('key', 'hero_image');
+
+        btn.textContent = '¡GUARDADO!';
+      } catch (e) {
+        console.error('saveHeroImage error', e);
+        btn.textContent = 'ERROR';
+      } finally {
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.disabled = false;
+        }, 2000);
+      }
+    }
+
+    function escapeHTML(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+  </script>
+</body>
+</html>

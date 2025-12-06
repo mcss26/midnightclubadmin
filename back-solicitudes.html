@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Midnight CMS — Solicitudes</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@700;800;900&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="back-styles.css" />
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+  <script src="back-config.js"></script>
+</head>
+<body>
+  <header class="admin-header">
+    <div class="admin-logo">SOLICITUDES</div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <a href="index.html" class="btn-ghost">PANEL</a>
+      <span id="userDisplay" style="color:#666;font-size:11px;font-weight:700;text-transform:uppercase;"></span>
+      <button onclick="logout()" class="btn-logout">SALIR</button>
+    </div>
+  </header>
+
+  <div class="admin-container">
+    <section class="dashboard-section">
+      <div class="section-header">
+        <div class="section-title">Altas de Members</div>
+        <button class="btn-refresh" onclick="loadRequests()">REFRESCAR</button>
+      </div>
+
+      <p class="section-subtitle" id="summaryCounts">
+        Pendientes: -- · Activos: -- · Rechazados: --
+      </p>
+
+      <div class="search-bar-container">
+        <input
+          id="searchInput"
+          class="search-input-admin"
+          type="text"
+          placeholder="Buscar por nombre, Instagram o email"
+          autocomplete="off"
+        />
+      </div>
+
+      <div class="filters-toolbar">
+        <button class="filter-chip active" data-status="pendiente">Pendientes</button>
+        <button class="filter-chip" data-status="activo">Activos</button>
+        <button class="filter-chip" data-status="rechazado">Rechazados</button>
+        <button class="filter-chip" data-status="debug">Debug</button>
+        <button class="filter-chip" data-status="all">Todos</button>
+      </div>
+
+      <div id="requestsList" class="request-list">
+        <div class="loading-state">Cargando...</div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'mid_cms_admin_v1';
+    let client = null;
+    let currentAdmin = null;
+    let allMembers = [];
+    let currentFilter = 'pendiente';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Auth básica: si no hay admin en storage, vuelvo al index/login
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) {
+          window.location.href = 'index.html';
+          return;
+        }
+        currentAdmin = JSON.parse(saved);
+        if (!currentAdmin || !currentAdmin.username) {
+          window.location.href = 'index.html';
+          return;
+        }
+        document.getElementById('userDisplay').textContent = currentAdmin.username.toUpperCase();
+      } catch (e) {
+        window.location.href = 'index.html';
+        return;
+      }
+
+      // Supabase + EmailJS
+      try {
+        client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      } catch (e) {
+        console.error('Supabase init error', e);
+      }
+      try {
+        emailjs.init(EMAILJS_PUBLIC_KEY);
+      } catch (e) {
+        console.warn('EmailJS init error', e);
+      }
+
+      // Filtros
+      document.querySelectorAll('.filter-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.filter-chip').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          currentFilter = btn.getAttribute('data-status') || 'pendiente';
+          renderList();
+        });
+      });
+
+      // Búsqueda
+      const searchInput = document.getElementById('searchInput');
+      if (searchInput) {
+        searchInput.addEventListener('input', () => {
+          renderList();
+        });
+      }
+
+      loadRequests();
+    });
+
+    function logout() {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (e) {}
+      window.location.href = 'index.html';
+    }
+
+    function escapeHTML(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function formatDate(isoString) {
+      if (!isoString) return '';
+      const d = new Date(isoString);
+      if (Number.isNaN(d.getTime())) return '';
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+
+    async function loadRequests() {
+      if (!client) return;
+      const listEl = document.getElementById('requestsList');
+      if (listEl) listEl.innerHTML = '<div class="loading-state">Cargando...</div>';
+
+      try {
+        const { data, error } = await client
+          .from('members')
+          .select('id, created_at, nombre, nacimiento, instagram, telefono, email, status, member_id, access_password')
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error cargando members', error);
+          if (listEl) listEl.innerHTML = '<div class="empty-state">Error al cargar solicitudes.</div>';
+          return;
+        }
+
+        allMembers = (data || []).filter(m =>
+          ['pendiente', 'activo', 'rechazado'].includes((m.status || '').toLowerCase())
+        );
+
+        updateSummary();
+        renderList();
+      } catch (e) {
+        console.error('loadRequests error', e);
+        if (listEl) listEl.innerHTML = '<div class="empty-state">Error al cargar solicitudes.</div>';
+      }
+    }
+
+    function updateSummary() {
+      const summaryEl = document.getElementById('summaryCounts');
+      if (!summaryEl) return;
+      let pend = 0, act = 0, rej = 0;
+      allMembers.forEach(m => {
+        const st = (m.status || '').toLowerCase();
+        if (st === 'pendiente') pend++;
+        else if (st === 'activo') act++;
+        else if (st === 'rechazado') rej++;
+      });
+      summaryEl.textContent = `Pendientes: ${pend} · Activos: ${act} · Rechazados: ${rej}`;
+    }
+
+    function hasCredsIssue(member) {
+      const st = (member.status || '').toLowerCase();
+      if (st !== 'activo') return false;
+
+      const rawId = (member.member_id ?? '').toString().trim().toLowerCase();
+      const rawPass = (member.access_password ?? '').toString().trim().toLowerCase();
+
+      const badId = !rawId || rawId === 'null' || rawId === 'undefined';
+      const badPass = !rawPass || rawPass === 'null' || rawPass === 'undefined';
+
+      return badId || badPass;
+    }
+
+    function renderList() {
+      const listEl = document.getElementById('requestsList');
+      if (!listEl) return;
+
+      const searchTerm = (document.getElementById('searchInput')?.value || '').toLowerCase().trim();
+
+      let filtered = allMembers.slice();
+
+      if (currentFilter === 'debug') {
+        filtered = filtered.filter(m => hasCredsIssue(m));
+      } else if (currentFilter !== 'all') {
+        filtered = filtered.filter(m => (m.status || '').toLowerCase() === currentFilter);
+      }
+
+      if (searchTerm) {
+        filtered = filtered.filter(m => {
+          const name = (m.nombre || '').toLowerCase();
+          const ig = (m.instagram || '').toLowerCase();
+          const mail = (m.email || '').toLowerCase();
+          return (
+            name.includes(searchTerm) ||
+            ig.includes(searchTerm) ||
+            mail.includes(searchTerm)
+          );
+        });
+      }
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = '<div class="empty-state">No hay solicitudes para este filtro.</div>';
+        return;
+      }
+
+      const rows = filtered.map((m, index) => {
+        const st = (m.status || '').toLowerCase();
+        let statusLabel = 'PENDIENTE';
+        if (st === 'activo') statusLabel = 'ACTIVO';
+        if (st === 'rechazado') statusLabel = 'RECHAZADO';
+
+        const igText = m.instagram ? '@' + m.instagram.replace('@', '') : 'sin IG';
+
+        const credsIssue = hasCredsIssue(m);
+
+        return `
+          <div class="request-card"
+               data-id="${escapeHTML(m.id)}"
+               data-name="${escapeHTML(m.nombre || '')}"
+               data-email="${escapeHTML(m.email || '')}"
+               data-member-id="${escapeHTML(m.member_id || '')}"
+               data-status="${escapeHTML(st)}">
+            <div class="req-index">${index + 1}</div>
+            <div class="req-info">
+              <h3>${escapeHTML(m.nombre || 'SIN NOMBRE')}</h3>
+              <div>
+                <span class="req-detail">${igText}</span>
+                <span class="req-detail">${escapeHTML(m.email || '')}</span>
+              </div>
+              <div>
+                <span class="req-detail">Alta: ${formatDate(m.created_at)}</span>
+                ${m.nacimiento ? `<span class="req-detail">Nac: ${escapeHTML(m.nacimiento)}</span>` : ''}
+              </div>
+              <div class="req-tags">
+                <span class="log-action-badge">${statusLabel}</span>
+                ${m.member_id ? `<span class="log-action-badge">ID: ${escapeHTML(m.member_id)}</span>` : ''}
+                ${credsIssue ? `<span class="log-action-badge" style="border-color:#e8372f;color:#e8372f;">DEBUG</span>` : ''}
+              </div>
+            </div>
+            <div class="item-actions">
+              ${st !== 'activo'
+                ? `<button class="btn-action btn-approve" data-action="approve">APROBAR</button>`
+                : ''}
+              ${st !== 'rechazado'
+                ? `<button class="btn-action btn-reject" data-action="reject">RECHAZAR</button>`
+                : ''}
+              ${credsIssue
+                ? `<button class="btn-action" data-action="debug">DEBUG</button>`
+                : ''}
+            </div>
+          </div>
+        `;
+      });
+
+      listEl.innerHTML = rows.join('');
+
+      // Delegación de eventos para botones (una vez por render)
+      listEl.addEventListener('click', handleListClick, { once: true });
+    }
+
+    function handleListClick(ev) {
+      const btn = ev.target.closest('button[data-action]');
+      const listEl = document.getElementById('requestsList');
+
+      if (!btn) {
+        if (listEl) listEl.addEventListener('click', handleListClick, { once: true });
+        return;
+      }
+
+      const action = btn.getAttribute('data-action');
+      const card = btn.closest('.request-card');
+      if (!card) return;
+
+      processAction(action, card);
+    }
+
+    function generateMemberId() {
+      const num = Math.floor(1000 + Math.random() * 9000);
+      return `MC-${num}`;
+    }
+
+    function generatePassword() {
+      return Math.random().toString(36).slice(-6).toUpperCase();
+    }
+
+    async function processAction(action, card) {
+      if (!client) return;
+
+      let confirmMsg = '';
+      if (action === 'approve') {
+        confirmMsg = '¿Aprobar esta solicitud y enviar credenciales?';
+      } else if (action === 'reject') {
+        confirmMsg = '¿Rechazar esta solicitud?';
+      } else if (action === 'debug') {
+        confirmMsg = '¿Reenviar mail de aprobado (DEBUG) con credenciales actualizadas?';
+      } else {
+        return;
+      }
+
+      if (!confirm(confirmMsg)) return;
+
+      const id = Number(card.dataset.id);
+      const name = card.dataset.name || '';
+      const email = card.dataset.email || '';
+      let memberId = card.dataset.memberId || '';
+      const status = (card.dataset.status || '').toLowerCase();
+
+      let update = {};
+      let newStatus = status;
+      let newPass = null;
+
+      if (action === 'approve') {
+        newStatus = 'activo';
+
+        if (!memberId || memberId === 'null' || memberId === 'undefined' || memberId.length < 3) {
+          memberId = generateMemberId();
+          update.member_id = memberId;
+        }
+
+        newPass = generatePassword();
+        update.access_password = newPass;
+      }
+
+      if (action === 'reject') {
+        newStatus = 'rechazado';
+      }
+
+      if (action === 'debug') {
+        newStatus = 'activo';
+
+        // Si el member_id está vacío/mal, generamos uno nuevo
+        if (!memberId || memberId === 'null' || memberId === 'undefined' || memberId.length < 3) {
+          memberId = generateMemberId();
+          update.member_id = memberId;
+        }
+
+        // Siempre generamos password nuevo para dejar todo prolijo
+        newPass = generatePassword();
+        update.access_password = newPass;
+      }
+
+      update.status = newStatus;
+
+      try {
+        const { error } = await client
+          .from('members')
+          .update(update)
+          .eq('id', id);
+
+        if (error) {
+          console.error('Error actualizando member', error);
+          alert('Error al actualizar. Revisá consola.');
+          return;
+        }
+
+        // Log
+        try {
+          if (currentAdmin && currentAdmin.username) {
+            const logAction =
+              action === 'debug'
+                ? 'CMS_SOLICITUD_DEBUG'
+                : `CMS_SOLICITUD_${newStatus.toUpperCase()}`;
+
+            client.from('admin_logs').insert({
+              admin_name: currentAdmin.username,
+              action: logAction,
+              details: name
+            }).then();
+          }
+        } catch (e) {
+          console.warn('Error guardando log', e);
+        }
+
+        // Email en APROBAR y DEBUG
+        if ((action === 'approve' || action === 'debug') &&
+            email && email.includes('@') &&
+            memberId && newPass) {
+          const params = {
+            to_name: name || '',
+            to_email: email,
+            member_id: memberId,
+            member_pass: newPass,
+            login_url: 'https://midnightclub.com.ar'
+          };
+          try {
+            emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_APROBADO, params);
+          } catch (e) {
+            console.error('Error enviando mail', e);
+          }
+        }
+
+        // Recargar lista para reflejar cambios
+        loadRequests();
+      } catch (e) {
+        console.error('processAction error', e);
+        alert('Error al procesar la acción.');
+      }
+    }
+  </script>
+</body>
+</html>

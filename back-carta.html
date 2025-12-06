@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Midnight CMS — Carta</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Outfit:wght@800;900&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="back-styles.css" />
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="back-config.js"></script>
+</head>
+<body>
+  <header class="admin-header">
+    <div class="admin-logo">CARTA</div>
+    <div style="display:flex;align-items:center;gap:10px;">
+      <a href="index.html" class="btn-ghost">PANEL</a>
+      <span id="userDisplay" style="color:#666;font-size:11px;font-weight:700;text-transform:uppercase;"></span>
+      <button onclick="logout()" class="btn-logout">SALIR</button>
+    </div>
+  </header>
+
+  <div class="admin-container">
+    <section class="dashboard-section">
+      <div class="section-header">
+        <div class="section-title">Productos Web</div>
+        <button onclick="openModal()" class="btn-primary">+ NUEVO</button>
+      </div>
+
+      <div class="filters-toolbar filter-chips">
+        <button class="filter-chip active" onclick="setFilter('all', this)">Todos</button>
+        <button class="filter-chip" onclick="setFilter('vasos', this)">Tragos</button>
+        <button class="filter-chip" onclick="setFilter('packs', this)">Packs</button>
+        <button class="filter-chip" onclick="setFilter('baja', this)">Baja</button>
+        <button class="filter-chip" onclick="setFilter('sin-alcohol', this)">Soft</button>
+      </div>
+
+      <div id="menu-list" class="menu-grid">
+        <div class="loading-state">Cargando...</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Modal item -->
+  <div id="itemModal" class="modal-overlay">
+    <div class="modal-box">
+      <h3 class="modal-title">Editar Item</h3>
+
+      <input type="hidden" id="editId">
+
+      <input type="text" id="editName" class="modal-input" placeholder="Nombre">
+      <input type="text" id="editDesc" class="modal-input" placeholder="Descripción (opcional)">
+
+      <div class="modal-row">
+        <div class="modal-col">
+          <input type="number" id="editPrice" class="modal-input" placeholder="Precio lista">
+        </div>
+        <div class="modal-col">
+          <select id="editCat" class="modal-select">
+            <option value="vasos">Tragos</option>
+            <option value="packs">Packs</option>
+            <option value="baja">Baja</option>
+            <option value="sin-alcohol">Soft</option>
+          </select>
+        </div>
+      </div>
+
+      <input type="text" id="editSub" class="modal-input" placeholder="Subcategoría (ej: Vodka)">
+
+      <div class="modal-btns">
+        <button type="button" class="btn-modal-cancel" onclick="closeModal()">CANCELAR</button>
+        <button type="button" class="btn-modal-save" onclick="saveItem()">GUARDAR</button>
+      </div>
+
+      <button
+        type="button"
+        id="btnDelete"
+        onclick="deleteItem()"
+        style="width:100%; margin-top:15px; background:none; border:none; color:#666; cursor:pointer; font-size:11px; text-transform:uppercase; letter-spacing:0.12em;"
+      >
+        ELIMINAR
+      </button>
+    </div>
+  </div>
+
+  <script>
+    const STORAGE_KEY = 'mid_cms_admin_v1';
+    let client = null;
+    let currentAdmin = null;
+
+    let allItems = [];
+    let currentCat = 'all';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      // Auth
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (!saved) {
+          window.location.href = 'index.html';
+          return;
+        }
+        currentAdmin = JSON.parse(saved);
+        if (!currentAdmin || !currentAdmin.username) {
+          window.location.href = 'index.html';
+          return;
+        }
+        document.getElementById('userDisplay').textContent =
+          currentAdmin.username.toUpperCase();
+      } catch (e) {
+        window.location.href = 'index.html';
+        return;
+      }
+
+      // Supabase
+      try {
+        client = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+      } catch (e) {
+        console.error('Supabase init error', e);
+      }
+
+      loadItems();
+    });
+
+    function logout() {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch (e) {}
+      window.location.href = 'index.html';
+    }
+
+    function escapeHTML(value) {
+      return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    async function loadItems() {
+      const container = document.getElementById('menu-list');
+      if (!client) {
+        if (container) {
+          container.innerHTML = '<div class="empty-state">Error de conexión.</div>';
+        }
+        return;
+      }
+
+      if (container) {
+        container.innerHTML = '<div class="loading-state">Cargando...</div>';
+      }
+
+      try {
+        const { data, error } = await client
+          .from('menu_items')
+          .select('*')
+          .order('name', { ascending: true });
+
+        if (error) {
+          console.error('Error cargando carta', error);
+          if (container) {
+            container.innerHTML =
+              '<div class="empty-state">Error al cargar la carta.</div>';
+          }
+          return;
+        }
+
+        allItems = data || [];
+        renderItems();
+      } catch (e) {
+        console.error('loadItems error', e);
+        if (container) {
+          container.innerHTML =
+            '<div class="empty-state">Error al cargar la carta.</div>';
+        }
+      }
+    }
+
+    function setFilter(cat, btn) {
+      currentCat = cat;
+      document.querySelectorAll('.filter-chip').forEach(b =>
+        b.classList.remove('active')
+      );
+      if (btn) btn.classList.add('active');
+      renderItems();
+    }
+
+    function renderItems() {
+      const container = document.getElementById('menu-list');
+      if (!container) return;
+
+      const list =
+        currentCat === 'all'
+          ? allItems
+          : allItems.filter(i => (i.category || '') === currentCat);
+
+      if (!list.length) {
+        container.innerHTML =
+          '<div class="empty-state">No hay productos para este filtro.</div>';
+        return;
+      }
+
+      const html = list
+        .map(i => {
+          const safeName = escapeHTML(i.name || '');
+          const safeSub = escapeHTML(i.subcategory || '-');
+          const safeId = Number(i.id);
+          const price = i.price ?? '';
+
+          return `
+          <div class="menu-item-card" style="opacity:${i.is_active ? 1 : 0.5}">
+            <div class="item-header">
+              <div style="color:#fff; font-weight:700;">${safeName}</div>
+              <div class="item-meta">${safeSub}</div>
+            </div>
+            <div class="item-actions">
+              <input
+                type="checkbox"
+                ${i.is_active ? 'checked' : ''}
+                onchange="toggleActive(${safeId}, this.checked)"
+              >
+              <input
+                type="number"
+                class="price-input"
+                value="${price}"
+                onchange="updatePrice(${safeId}, this.value)"
+              >
+              <button
+                type="button"
+                onclick="editItem(${safeId})"
+                style="background:none;border:none;cursor:pointer;font-size:16px;"
+              >
+                ✏️
+              </button>
+            </div>
+          </div>
+        `;
+        })
+        .join('');
+
+      container.innerHTML = html;
+    }
+
+    async function toggleActive(id, isActive) {
+      if (!client) return;
+      try {
+        await client
+          .from('menu_items')
+          .update({ is_active: isActive })
+          .eq('id', id);
+      } catch (e) {
+        console.error('toggleActive error', e);
+      }
+    }
+
+    async function updatePrice(id, val) {
+      if (!client) return;
+      const priceNum = Number(val);
+      if (Number.isNaN(priceNum)) return;
+      try {
+        await client
+          .from('menu_items')
+          .update({ price: priceNum })
+          .eq('id', id);
+      } catch (e) {
+        console.error('updatePrice error', e);
+      }
+    }
+
+    function openModal() {
+      document.getElementById('editId').value = '';
+      document.getElementById('editName').value = '';
+      document.getElementById('editDesc').value = '';
+      document.getElementById('editPrice').value = '';
+      document.getElementById('editCat').value = 'vasos';
+      document.getElementById('editSub').value = '';
+      document.getElementById('btnDelete').style.display = 'none';
+      document.getElementById('itemModal').classList.add('is-open');
+    }
+
+    function closeModal() {
+      document.getElementById('itemModal').classList.remove('is-open');
+    }
+
+    function editItem(id) {
+      const item = allItems.find(x => x.id === id);
+      if (!item) return;
+
+      document.getElementById('editId').value = item.id;
+      document.getElementById('editName').value = item.name || '';
+      document.getElementById('editDesc').value = item.description || '';
+      document.getElementById('editPrice').value = item.price ?? '';
+      document.getElementById('editCat').value = item.category || 'vasos';
+      document.getElementById('editSub').value = item.subcategory || '';
+
+      document.getElementById('btnDelete').style.display = 'block';
+      document.getElementById('itemModal').classList.add('is-open');
+    }
+
+    async function saveItem() {
+      if (!client) return;
+
+      const id = document.getElementById('editId').value;
+      const name = document.getElementById('editName').value.trim();
+      const desc = document.getElementById('editDesc').value.trim();
+      const priceVal = document.getElementById('editPrice').value;
+      const category = document.getElementById('editCat').value;
+      const subcat = document.getElementById('editSub').value.trim();
+
+      if (!name || !priceVal || !category) {
+        alert('Nombre, precio y categoría son obligatorios.');
+        return;
+      }
+
+      const priceNum = Number(priceVal);
+      if (Number.isNaN(priceNum)) {
+        alert('Precio inválido.');
+        return;
+      }
+
+      const data = {
+        name,
+        description: desc || null,
+        price: priceNum,
+        category,
+        subcategory: subcat || null
+      };
+
+      try {
+        if (id) {
+          await client.from('menu_items').update(data).eq('id', Number(id));
+        } else {
+          await client.from('menu_items').insert(data);
+        }
+        closeModal();
+        loadItems();
+      } catch (e) {
+        console.error('saveItem error', e);
+        alert('Error al guardar el item.');
+      }
+    }
+
+    async function deleteItem() {
+      if (!client) return;
+      const id = document.getElementById('editId').value;
+      if (!id) return;
+      if (!confirm('¿Eliminar este item de la carta?')) return;
+
+      try {
+        await client.from('menu_items').delete().eq('id', Number(id));
+        closeModal();
+        loadItems();
+      } catch (e) {
+        console.error('deleteItem error', e);
+        alert('Error al eliminar el item.');
+      }
+    }
+  </script>
+</body>
+</html>
